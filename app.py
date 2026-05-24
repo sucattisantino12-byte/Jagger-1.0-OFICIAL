@@ -2411,6 +2411,9 @@ function renderCajaInner(caja) {
         <span id="caja-gasto-label-${caja}" style="font-family:'Rajdhani',sans-serif;font-size:13px;color:#888;letter-spacing:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
         <span class="caja-total-val" id="ctotal${caja}">$0</span>
       </div>
+    </div>
+    <div style="padding:6px 0 4px;">
+      <button onclick="cerrarGanadorDesdeCaja()" style="width:100%;background:#0d0800;border:1px solid #3a2a0066;border-radius:8px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;color:#555;letter-spacing:2px;cursor:pointer;text-transform:uppercase;transition:all .15s;" onmouseover="this.style.borderColor='#c9a227';this.style.color='#c9a227'" onmouseout="this.style.borderColor='#3a2a0066';this.style.color='#555'">🏆 Cerrar mensaje de ganador</button>
     </div>`;
 
   const amEl = document.getElementById('amount'+caja);
@@ -2571,19 +2574,22 @@ async function addTx(caja, conTarjeta) {
 async function deleteTx(id) {
   await fetch('/api/tx/'+id,{method:'DELETE'});
   await loadData();
-  if (cajaState) {
-    showToast('⚠ Volvé a pasar la tarjeta para refrescar el saldo', false, 4000);
-    // Reset sesión para forzar re-scan
-    cajaState = null;
-    totalGastadoSesion = 0;
-    renderTarjeta();
-    document.getElementById('menu-area-tarjeta').style.opacity = '.3';
-    document.getElementById('menu-area-tarjeta').style.pointerEvents = 'none';
-    const scanT = document.getElementById('scan-hint-tarjeta');
-    if (scanT) { scanT.className='scan-hint esperando'; document.getElementById('scan-txt').textContent='▸ Pasá la tarjeta por el lector para comenzar'; }
-    const btn = document.getElementById('btn-cobrar-tarjeta');
-    if (btn) btn.disabled = true;
+  // Refrescar saldo de tarjeta activa sin forzar re-scan
+  if (cajaState && cajaState.codigo) {
+    const td = tarjetasData[cajaState.codigo];
+    if (td && td.saldo_actual !== undefined) {
+      cajaState.saldo_actual = td.saldo_actual;
+      renderTarjeta();
+    }
   }
+}
+async function cerrarGanadorDesdeCaja() {
+  try {
+    const st = await fetch('/api/state').then(r=>r.json()).catch(()=>({}));
+    if (!st.winner_show) { showToast('El ganador todavía no apareció en pantalla', false); return; }
+    await fetch('/api/winner/hide', {method:'POST'});
+    showToast('Mensaje de ganador cerrado ✓');
+  } catch(e) { showToast('Error de conexión', true); }
 }
 function editTx(id, amount, name) {
   document.getElementById('edit-tx-id').value = id;
@@ -3949,7 +3955,7 @@ async function guardarNombreInline(inp, id) {
   if (!nuevo) { await cargarMenuMgr(); return; }
   try {
     await fetch('/api/menu/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:nuevo})});
-    await cargarMenuMgr(); showToast('Nombre actualizado');
+    await cargarMenuMgr(); showToast('Nombre actualizado ✓ — Recordá refrescar las cajas (F5)', false, 5000);
   } catch(e) { await cargarMenuMgr(); }
 }
 function editarPrecioInline(el) {
@@ -3970,7 +3976,7 @@ async function guardarPrecioInline(inp, id) {
   try {
     await fetch('/api/menu/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({precio: nuevo})});
     await cargarMenuMgr();
-    showToast('Precio actualizado');
+    showToast('Precio actualizado ✓ — Recordá refrescar las cajas (F5)', false, 5000);
   } catch(e) { cargarMenuMgr(); }
 }
 
@@ -4348,6 +4354,14 @@ body{background:#060606;color:#e0e0e0;font-family:'Rajdhani',sans-serif;min-heig
     <span class="sublabel">Caja 3</span>
   </a>
 </div>
+<div class="hub-divider"></div>
+<div class="hub-grid" style="grid-template-columns:1fr;">
+  <a id="btn-celular" href="/celular" class="hub-btn" style="opacity:.35;pointer-events:none;filter:grayscale(1);grid-column:1;background:linear-gradient(135deg,#0a0a14,#101020);border-color:#1a1a3a;">
+    <span class="icon">📱</span>
+    <span class="label">Celular</span>
+    <span class="sublabel" id="celular-sublabel">Requiere sesión Manager</span>
+  </a>
+</div>
 <script>
 function cerrarSesion() {
   fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
@@ -4358,10 +4372,21 @@ fetch('/api/session').then(r=>r.json()).then(s=>{
   const el=document.getElementById('hub-session');
   const txt=document.getElementById('hub-session-txt');
   const btn=document.getElementById('hub-logout-btn');
+  const btnCelular=document.getElementById('btn-celular');
+  const celularSub=document.getElementById('celular-sublabel');
   if(s.manager){
     el.classList.add('active');
     txt.textContent='Sesión activa — Manager';
     if(btn) btn.style.display='inline-flex';
+    // Desbloquear celular
+    if(btnCelular){
+      btnCelular.style.opacity='1';
+      btnCelular.style.pointerEvents='auto';
+      btnCelular.style.filter='none';
+      btnCelular.style.borderColor='#1a2a5a';
+      btnCelular.style.background='linear-gradient(135deg,#08081a,#101028)';
+    }
+    if(celularSub) celularSub.textContent='Monitor en vivo';
   } else {
     const cajas=[];
     if(s.cajaabajo) cajas.push('Caja Abajo');
@@ -5847,19 +5872,28 @@ async function checkPublicidad() {
     const r = await fetch('/api/publicidad/estado');
     const d = await r.json();
     pubFrecuenciaMs = (parseInt(d.frecuencia)||15) * 60 * 1000;
-    if (!d.url) { pubActiva = false; return; }
-    // Mostrar sincronizado: usar server_time para calcular offset exacto
+    if (!d.url) { pubActiva = false; cerrarPublicidad(); return; }
+
+    // Bug fix 1: chequear activa ANTES de procesar mostrar_ts
+    if (!d.activa) {
+      if (pubActiva) cerrarPublicidad(); // Bug fix 2: cerrar si estaba activo localmente
+      pubActiva = false;
+      return;
+    }
+
+    pubActiva = true;
+
+    // Mostrar sincronizado: "Mostrar ahora" desde el manager
     const ts = d.mostrar_ts || 0;
     if (ts > 0 && ts !== _pubMostrarTsAnterior) {
       _pubMostrarTsAnterior = ts;
-      // Calcular cuántos segundos pasaron desde que el manager apretó el botón
       const serverNow = d.server_time || (Date.now() / 1000);
       const offset = Math.max(0, serverNow - ts);
       mostrarPublicidadSync(d.url, offset);
       return;
     }
-    if (!d.activa) { pubActiva = false; return; }
-    pubActiva = true;
+
+    // Mostrar por frecuencia programada
     const now = Date.now();
     if (now - pubLastShown >= pubFrecuenciaMs) {
       mostrarPublicidad(d.url);
@@ -6388,6 +6422,7 @@ body{background:var(--black);color:var(--text);font-family:'Rajdhani',sans-serif
   <div class="caja-badge">Caja {{ caja_num }}</div>
   <div class="caja-title">{{ caja_nombre }}</div>
   <button onclick="abrirCartelModal()" style="background:#1a1500;border:1px solid var(--gold);color:var(--gold);border-radius:6px;padding:6px 12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase;flex-shrink:0;">🍾 Cartel</button>
+  <button onclick="cerrarGanadorDesdeCaja()" style="background:#0d0800;border:1px solid #3a2a00;color:#7a6010;border-radius:6px;padding:6px 12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase;flex-shrink:0;transition:all .15s;" onmouseover="this.style.borderColor='#c9a227';this.style.color='#c9a227'" onmouseout="this.style.borderColor='#3a2a00';this.style.color='#7a6010'">🏆 Cerrar Ganador</button>
   <button onclick="cerrarCartelPantalla()" style="background:#150a0a;border:1px solid #5a2020;color:#e74c3c;border-radius:6px;padding:6px 12px;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;cursor:pointer;text-transform:uppercase;flex-shrink:0;">✕ Cerrar</button>
   <a href="/" class="back-btn">← Hub</a>
 </div>
@@ -6423,9 +6458,19 @@ body{background:var(--black);color:var(--text);font-family:'Rajdhani',sans-serif
 <div class="modo-content active" id="mc-tarjeta">
   <!-- Scan zone -->
   <div class="scan-zone">
-    <div class="scan-hint esperando" id="scan-hint-tarjeta">
-      <span class="scan-icon">▤</span>
-      <span id="scan-txt">Pasá la tarjeta por el lector para comenzar</span>
+    <div style="display:flex;align-items:center;gap:8px;position:relative;">
+      <div class="scan-hint esperando" id="scan-hint-tarjeta" style="flex:1;">
+        <span class="scan-icon">▤</span>
+        <span id="scan-txt">Pasá la tarjeta por el lector para comenzar</span>
+      </div>
+      <button onclick="toggleMesasPopupTarjeta()" id="btn-mesas-tarjeta" title="Seleccionar mesa manualmente" style="background:#0f0e05;border:1px solid #c9a22766;border-radius:8px;padding:10px 13px;font-size:18px;cursor:pointer;color:#c9a227;flex-shrink:0;line-height:1;transition:border-color .15s;" onmouseover="this.style.borderColor='#c9a227'" onmouseout="this.style.borderColor='#c9a22766'">🗂</button>
+      <div id="mesas-popup-tarjeta" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:#111;border:1px solid #c9a22744;border-radius:12px;min-width:260px;max-width:320px;box-shadow:0 8px 40px rgba(0,0,0,0.9);overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;border-bottom:1px solid #1e1e1e;">
+          <span style="font-family:'Oswald',sans-serif;font-size:11px;color:#c9a227;letter-spacing:2px;text-transform:uppercase;">Seleccionar mesa</span>
+          <button onclick="document.getElementById('mesas-popup-tarjeta').style.display='none'" style="background:none;border:none;color:#444;font-size:16px;cursor:pointer;line-height:1;padding:0 2px;">✕</button>
+        </div>
+        <div id="mesas-popup-list-tarjeta" style="max-height:240px;overflow-y:auto;"></div>
+      </div>
     </div>
     <div class="tarjeta-card" id="tarjeta-card"></div>
   </div>
@@ -6688,7 +6733,11 @@ async function handleScan(codigo) {
     if (menuArea) { menuArea.style.opacity='1'; menuArea.style.pointerEvents='auto'; }
     const ni = document.getElementById('name-tarjeta');
     if (ni) ni.value = nombre || '';
-    showToast('Tarjeta — Mesa '+conf.slot+' — Saldo: '+fmt(saldoActual));
+    if (saldoActual <= 0) {
+      showToast('Mesa '+conf.slot+' — '+nombre+' — SIN SALDO', true);
+    } else {
+      showToast('Tarjeta — Mesa '+conf.slot+' — Saldo: '+fmt(saldoActual));
+    }
   } catch(e) { showToast('Error leyendo tarjeta', true); }
 }
 
@@ -6703,12 +6752,11 @@ function renderTarjeta() {
     const ta = cajaState;
     if (!ta) { el.className='tarjeta-card'; el.innerHTML=''; return; }
     const pedidoActual = calcTotalActual();
-    const totalGastado = totalGastadoSesion + pedidoActual;
-    // Usar saldo_actual como techo real (puede ser > saldo_inicial si hubo recargas)
+    // saldo_actual ya refleja lo gastado anteriormente (se descuenta al confirmar)
+    // solo hay que ver si el PEDIDO ACTUAL excede lo que queda
     const techoReal = Math.max(ta.saldo_inicial, ta.saldo_actual);
-    const excede = ta.saldo_actual > 0 && totalGastado > ta.saldo_actual;
+    const excede = pedidoActual > 0 && pedidoActual > ta.saldo_actual;
     const sinSaldo = ta.saldo_actual <= 0;
-    // La barra muestra el saldo restante tras el pedido actual (baja mientras se agregan items)
     const saldoTrasBar = Math.max(0, ta.saldo_actual - pedidoActual);
     const pct = techoReal > 0 ? Math.max(0, Math.min(100, Math.round((saldoTrasBar / techoReal) * 100))) : 0;
     const saldoTrasComp = ta.saldo_actual - pedidoActual;
@@ -6730,13 +6778,13 @@ function renderTarjeta() {
       <span style="font-size:11px;color:#888;letter-spacing:2px;text-transform:uppercase;">Quedaría</span>
       <span style="font-family:'Oswald',sans-serif;font-size:28px;color:${excede?'#ff3333':warnBajo?'#ffaa00':'#4aaa4a'};font-weight:700;">${fmt(saldoTrasComp)}</span>
     </div>` :
-    `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:${excede?'#1a0000':warnBajo?'#1a1200':'#0a1000'};border:1px solid ${excede?'#aa2020':warnBajo?'#886600':'#1a4a1a'};display:flex;justify-content:space-between;align-items:center;min-height:42px;">
-      <span style="font-size:11px;color:#888;letter-spacing:2px;text-transform:uppercase;">Total gastado</span>
-      <span style="font-family:'Oswald',sans-serif;font-size:26px;color:${excede?'#ff3333':warnBajo?'#ffaa00':'#4aaa4a'};font-weight:700;">${totalGastado>0?fmt(totalGastado):'$0'}</span>
+    `<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:#0a1000;border:1px solid #1a4a1a;display:flex;justify-content:space-between;align-items:center;min-height:42px;">
+      <span style="font-size:11px;color:#888;letter-spacing:2px;text-transform:uppercase;">Saldo disponible</span>
+      <span style="font-family:'Oswald',sans-serif;font-size:26px;color:${sinSaldo?'#a83030':pctRest<=0.3?'#ffaa00':'#4aaa4a'};font-weight:700;">${fmt(ta.saldo_actual)}</span>
     </div>`}
     ${excede?`<div class="saldo-bajo-warn" style="border-color:#a83030;color:#ff4444;margin-top:4px;">✕ Saldo insuficiente — faltan ${fmt(Math.abs(saldoTrasComp))}</div>`:''}
     ${warnBajo&&!pedidoActual?`<div class="saldo-bajo-warn" style="border-color:#886600;color:#ffaa00;margin-top:4px;">⚠ Saldo bajo — queda ${Math.round(pctRest*100)}%</div>`:''}
-    ${sinSaldo&&totalGastado===0?`<div class="saldo-bajo-warn" style="border-color:#a83030;color:#ff4444;">✕ Sin saldo disponible</div>`:''}`;
+    ${sinSaldo?`<div class="saldo-bajo-warn" style="border-color:#a83030;color:#ff4444;">✕ Sin saldo disponible</div>`:''}`;
   });
   updateGastoSesion('tarjeta');
   const scanT = document.getElementById('scan-hint-tarjeta');
@@ -6806,6 +6854,69 @@ function seleccionarMesaCaja(mesa) {
   if (input) input.value = mesa;
   const popup = document.getElementById('mesas-popup-caja');
   if (popup) popup.style.display = 'none';
+}
+
+function toggleMesasPopupTarjeta() {
+  const popup = document.getElementById('mesas-popup-tarjeta');
+  if (!popup) return;
+  if (popup.style.display === 'none') {
+    popup.style.display = 'block';
+    buildMesasPopupTarjeta();
+    setTimeout(() => {
+      document.addEventListener('click', function closePop(e) {
+        if (!popup.contains(e.target) && e.target.id !== 'btn-mesas-tarjeta') {
+          popup.style.display = 'none';
+          document.removeEventListener('click', closePop);
+        }
+      });
+    }, 10);
+  } else {
+    popup.style.display = 'none';
+  }
+}
+
+async function buildMesasPopupTarjeta() {
+  const list = document.getElementById('mesas-popup-list-tarjeta');
+  if (!list) return;
+  list.innerHTML = '<div style="padding:16px;color:#555;text-align:center;">Cargando...</div>';
+  try {
+    const [r1, r2] = await Promise.all([fetch('/api/tarjetas'), fetch('/api/tarjetas/config')]);
+    tarjetasData = await r1.json();
+    const conf_list = await r2.json();
+    const tarjetas = conf_list.filter(t => t.codigo && t.slot != null);
+    tarjetas.sort((a, b) => Number(a.slot) - Number(b.slot));
+    if (!tarjetas.length) {
+      list.innerHTML = '<div style="padding:20px;color:#444;font-size:15px;text-align:center;">Sin tarjetas configuradas</div>';
+      return;
+    }
+    list.innerHTML = tarjetas.map(t => {
+      const nombre = t.nombre_cliente || '—';
+      const td = tarjetasData[t.codigo] || {};
+      const saldo = td.saldo_actual !== undefined ? td.saldo_actual : parseFloat(t.saldo_inicial || 0);
+      const sinSaldo = saldo <= 0;
+      const clickHandler = `seleccionarMesaTarjeta('${esc(t.codigo)}')`;
+      return `<div onclick="${clickHandler}" style="padding:14px 20px;cursor:pointer;border-bottom:1px solid #1a1a1a;transition:background .12s;${sinSaldo?'opacity:.45':''}" onmouseover="this.style.background='#1a1600'" onmouseout="this.style.background='transparent'">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Oswald',sans-serif;font-size:28px;color:${sinSaldo?'#555':'#c9a227'};font-weight:700;letter-spacing:2px;line-height:1;">MESA ${esc(String(t.slot))}</div>
+            <div style="font-family:'Rajdhani',sans-serif;font-size:15px;color:${sinSaldo?'#444':'#e0e0e0'};font-weight:600;margin-top:3px;">${esc(nombre)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;color:${sinSaldo?'#a83030':'#4aaa4a'};font-weight:700;">${fmt(saldo)}</div>
+            <div style="font-size:11px;color:#444;letter-spacing:1px;">${sinSaldo?'SIN SALDO':'SALDO'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="padding:16px;color:#555;text-align:center;">Error cargando mesas</div>';
+  }
+}
+
+async function seleccionarMesaTarjeta(codigo) {
+  document.getElementById('mesas-popup-tarjeta').style.display = 'none';
+  // Simula exactamente lo mismo que handleScan pero sin lector físico
+  await handleScan(codigo);
 }
 
 function setModo(m) {
@@ -6904,18 +7015,41 @@ function renderMenuProds(side) {
 }
 
 function addToOrder(side, id) {
+  if (side === 'tarjeta' && cajaState) {
+    const p = menuData.find(x => x.id === id);
+    if (p) {
+      const totalActual = calcTotal('tarjeta');
+      const nuevoPrecio = p.precio * ((orderT[id]||0) + 1) - p.precio * (orderT[id]||0);
+      if (totalActual + nuevoPrecio > cajaState.saldo_actual) {
+        showToast('Saldo insuficiente para agregar '+p.nombre+' — Disponible: '+fmt(cajaState.saldo_actual), true);
+        return;
+      }
+    }
+  }
   if (side==='tarjeta') orderT[id]=(orderT[id]||0)+1;
   else orderM[id]=(orderM[id]||0)+1;
   renderMenuProds(side);
   renderOrder(side);
+  if (side === 'tarjeta') renderTarjeta();
 }
 
 function changeQty(side, id, delta) {
   const order = side==='tarjeta' ? orderT : orderM;
+  if (delta > 0 && side === 'tarjeta' && cajaState) {
+    const p = menuData.find(x => x.id === id);
+    if (p) {
+      const totalActual = calcTotal('tarjeta');
+      if (totalActual + p.precio > cajaState.saldo_actual) {
+        showToast('Saldo insuficiente para agregar '+p.nombre, true);
+        return;
+      }
+    }
+  }
   order[id] = Math.max(0,(order[id]||0)+delta);
   if (!order[id]) delete order[id];
   renderMenuProds(side);
   renderOrder(side);
+  if (side === 'tarjeta') renderTarjeta();
 }
 
 function changeVarQty(side, idx, delta) {
@@ -7069,21 +7203,39 @@ async function confirmarTarjeta() {
   const total = calcTotal('tarjeta');
   if (total > ta.saldo_actual) { showToast('Saldo insuficiente. Disponible: '+fmt(ta.saldo_actual), true); return; }
   const name = ta.nombre || 'Cliente';
+  // Deshabilitar botón mientras se procesa
+  const btnCobrar = document.getElementById('btn-cobrar-tarjeta');
+  if (btnCobrar) btnCobrar.disabled = true;
   try {
     const res = await fetch('/api/tx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       name, amount:total, caja:CAJA, mesa:ta.mesa, tarjeta_codigo:ta.codigo, client_time:now(), items
     })});
-    if (res.ok) {
-      ta.saldo_actual -= total; ta.nombre = name;
+    let d = {};
+    try { d = await res.json(); } catch(_) {}
+    if (res.ok && d.ok !== false) {
+      // Éxito: limpiar pedido y actualizar saldo
+      ta.saldo_actual -= total;
+      ta.nombre = name;
       totalGastadoSesion += total;
-      showToastCobro(fmt(total)+' cobrado ✓ — Saldo restante: '+fmt(ta.saldo_actual));
-      orderT={}; variosT=[];
+      orderT = {}; variosT = [];
+      // Ocultar confirm-bar explícitamente
+      const cb = document.getElementById('confirm-bar-tarjeta');
+      if (cb) cb.classList.remove('show');
+      const panel = document.getElementById('order-panel-tarjeta');
+      if (panel) panel.classList.remove('show');
       renderTarjeta();
       renderMenuProds('tarjeta');
       renderOrder('tarjeta');
       await loadData();
-    } else { const err=await res.json().catch(()=>({})); showToast(err.error||'Error', true); }
-  } catch(e){ showToast('Error de conexión', true); }
+      showToastCobro(fmt(total)+' cobrado ✓' + (ta.saldo_actual > 0 ? ' — Saldo: '+fmt(ta.saldo_actual) : ' — Sin saldo restante'));
+    } else {
+      showToast(d.error || 'Error al registrar — intentá de nuevo', true);
+      if (btnCobrar) btnCobrar.disabled = false;
+    }
+  } catch(e) {
+    showToast('Error al enviar — verificá la conexión', true);
+    if (btnCobrar) btnCobrar.disabled = false;
+  }
 }
 
 async function confirmarManual() {
@@ -7222,9 +7374,26 @@ function renderList() {
   if (el) el.textContent = fmt(total);
 }
 
+async function cerrarGanadorDesdeCaja() {
+  try {
+    const st = await fetch('/api/state').then(r=>r.json()).catch(()=>({}));
+    if (!st.winner_show) { showToast('El ganador todavía no apareció en pantalla', false); return; }
+    await fetch('/api/winner/hide', {method:'POST'});
+    showToast('Mensaje de ganador cerrado ✓');
+  } catch(e) { showToast('Error de conexión', true); }
+}
+
 async function deleteTx(id) {
   await fetch('/api/tx/'+id,{method:'DELETE'});
   await loadData();
+  // Si hay una tarjeta activa, actualizar su saldo desde los datos frescos
+  if (cajaState && cajaState.codigo) {
+    const td = tarjetasData[cajaState.codigo];
+    if (td && td.saldo_actual !== undefined) {
+      cajaState.saldo_actual = td.saldo_actual;
+      renderTarjeta();
+    }
+  }
 }
 
 ['varios-monto-tarjeta','varios-monto-manual'].forEach(id => {
@@ -7717,6 +7886,202 @@ def hub():
 def pantalla_page():
     return render_template_string(PANTALLA_HTML)
 
+@app.route('/celular')
+def celular_page():
+    login = require_auth('manager', 'Celular', '/celular')
+    if login: return login
+    return render_template_string(MONITOR_HTML)
+
+MONITOR_HTML = """<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Monitor — Jagger VIP</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{background:#080808;color:#f0ece0;font-family:'Rajdhani',sans-serif;min-height:100vh;overscroll-behavior:none;}
+body{padding:0 0 32px;}
+
+/* Header */
+.mon-header{background:#0d0c00;border-bottom:1px solid #2a2200;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.mon-logo{font-family:'Oswald',sans-serif;font-size:18px;font-weight:700;color:#c9a227;letter-spacing:3px;}
+.mon-sub{font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.mon-live{display:flex;align-items:center;gap:6px;font-size:11px;color:#3a9a5a;letter-spacing:1px;font-weight:700;}
+.mon-live-dot{width:7px;height:7px;border-radius:50%;background:#3a9a5a;animation:pulse 1.8s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 12px 0;}
+.kpi-box{background:#0d0c00;border:1px solid #2a2200;border-radius:10px;padding:12px 14px;}
+.kpi-label{font-size:10px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.kpi-val{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#c9a227;}
+
+/* Ranking */
+.ranking-title{font-size:10px;color:#444;letter-spacing:3px;text-transform:uppercase;padding:16px 14px 6px;font-weight:700;}
+
+.rank-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #111;transition:background .15s;}
+.rank-item:active{background:#111;}
+.rank-pos{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#333;width:28px;text-align:center;flex-shrink:0;}
+.rank-pos.gold{color:#c9a227;}
+.rank-pos.silver{color:#aaaaaa;}
+.rank-pos.bronze{color:#cd7f32;}
+.rank-info{flex:1;min-width:0;}
+.rank-name{font-family:'Oswald',sans-serif;font-size:19px;font-weight:700;color:#f0ece0;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-mesa{font-size:12px;color:#555;letter-spacing:1px;margin-top:1px;}
+.rank-amount{font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#c9a227;flex-shrink:0;text-align:right;}
+
+/* Barra de progreso relativa al 1ro */
+.rank-bar-wrap{height:3px;background:#1a1a1a;border-radius:2px;margin-top:6px;}
+.rank-bar{height:3px;border-radius:2px;background:linear-gradient(90deg,#c9a227,#e8c84a);transition:width .4s ease;}
+
+/* Saldo tarjetas */
+.saldo-title{font-size:10px;color:#444;letter-spacing:3px;text-transform:uppercase;padding:16px 14px 6px;font-weight:700;}
+.saldo-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #111;}
+.saldo-mesa{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#888;width:56px;flex-shrink:0;}
+.saldo-nombre{flex:1;font-size:14px;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.saldo-val{font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;flex-shrink:0;}
+.saldo-val.ok{color:#4aaa4a;}
+.saldo-val.bajo{color:#ffaa00;}
+.saldo-val.cero{color:#a83030;}
+.saldo-bar-wrap{height:2px;background:#1a1a1a;border-radius:1px;margin-top:4px;}
+.saldo-bar{height:2px;border-radius:1px;transition:width .4s ease;}
+
+/* Empty */
+.empty{padding:32px 20px;text-align:center;color:#333;font-size:14px;letter-spacing:1px;}
+
+/* Update indicator */
+.update-row{padding:8px 14px;text-align:right;font-size:10px;color:#2a2a2a;letter-spacing:1px;}
+</style>
+</head>
+<body>
+
+<div class="mon-header">
+  <div>
+    <div class="mon-logo">RANKING VIP</div>
+    <div class="mon-sub">Monitor en vivo</div>
+  </div>
+  <div class="mon-live"><div class="mon-live-dot"></div>EN VIVO</div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-box">
+    <div class="kpi-label">Total noche</div>
+    <div class="kpi-val" id="kpi-total">$0</div>
+  </div>
+  <div class="kpi-box">
+    <div class="kpi-label">Operaciones</div>
+    <div class="kpi-val" id="kpi-ops">0</div>
+  </div>
+</div>
+
+<div class="ranking-title">🏆 RANKING</div>
+<div id="ranking-list"></div>
+
+<div class="saldo-title">💳 SALDOS DE TARJETAS</div>
+<div id="saldo-list"></div>
+
+<div class="update-row" id="update-label">—</div>
+
+<script>
+function fmt(n){return '$'+Number(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function refresh() {
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      fetch('/api/tx'),
+      fetch('/api/tarjetas'),
+      fetch('/api/tarjetas/config')
+    ]);
+    const txs = await r1.json();
+    const saldos = await r2.json();
+    const conf = await r3.json();
+
+    // ── KPIs ──
+    const total = txs.reduce((s,t) => s + t.amount, 0);
+    document.getElementById('kpi-total').textContent = fmt(total);
+    document.getElementById('kpi-ops').textContent = txs.length;
+
+    // ── Ranking ──
+    const totals = {}, mesas = {};
+    txs.forEach(t => {
+      totals[t.name] = (totals[t.name]||0) + t.amount;
+      if (t.mesa) mesas[t.name] = t.mesa;
+    });
+    const ranking = Object.entries(totals).sort((a,b) => b[1]-a[1]);
+    const max = ranking[0]?.[1] || 1;
+    const medals = ['🥇','🥈','🥉'];
+    const posClass = ['gold','silver','bronze'];
+    const rl = document.getElementById('ranking-list');
+    if (!ranking.length) {
+      rl.innerHTML = '<div class="empty">Sin consumos registrados</div>';
+    } else {
+      rl.innerHTML = ranking.map(([name, amount], i) => {
+        const pct = Math.round(amount / max * 100);
+        const pc = posClass[i] || '';
+        const medal = medals[i] || (i+1);
+        return `<div class="rank-item">
+          <div class="rank-pos ${pc}">${medal}</div>
+          <div class="rank-info">
+            <div class="rank-name">${esc(name)}</div>
+            <div class="rank-mesa">Mesa ${esc(mesas[name]||'—')}</div>
+            <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%"></div></div>
+          </div>
+          <div class="rank-amount">${fmt(amount)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Saldos ──
+    const activas = conf.filter(t => t.codigo).sort((a,b) => Number(a.slot)-Number(b.slot));
+    const sl = document.getElementById('saldo-list');
+    if (!activas.length) {
+      sl.innerHTML = '<div class="empty">Sin tarjetas configuradas</div>';
+    } else {
+      sl.innerHTML = activas.map(t => {
+        const td = saldos[t.codigo] || {};
+        const ini = parseFloat(t.saldo_inicial||0);
+        const act = td.saldo_actual !== undefined ? td.saldo_actual : ini;
+        const techo = Math.max(ini, act);
+        const pct = techo > 0 ? Math.min(100, Math.round(act/techo*100)) : 0;
+        const cls = act <= 0 ? 'cero' : pct <= 25 ? 'bajo' : 'ok';
+        const barColor = act <= 0 ? '#a83030' : pct <= 25 ? '#ffaa00' : '#4aaa4a';
+        return `<div class="saldo-item">
+          <div>
+            <div class="saldo-mesa">Mesa ${esc(String(t.slot))}</div>
+          </div>
+          <div class="rank-info">
+            <div class="saldo-nombre">${esc(t.nombre_cliente||'—')}</div>
+            <div class="saldo-bar-wrap"><div class="saldo-bar" style="width:${pct}%;background:${barColor};"></div></div>
+          </div>
+          <div class="saldo-val ${cls}">${fmt(act)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // timestamp
+    const now = new Date();
+    document.getElementById('update-label').textContent =
+      'Actualizado ' + now.getHours().toString().padStart(2,'0') + ':' +
+      now.getMinutes().toString().padStart(2,'0') + ':' +
+      now.getSeconds().toString().padStart(2,'0');
+
+  } catch(e) {
+    document.getElementById('update-label').textContent = 'Sin conexión...';
+  }
+}
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>
+"""
+
 @app.route('/tarjetas')
 def tarjetas_page():
     login = require_auth('tarjetas', 'Tarjetas', '/tarjetas')
@@ -7798,6 +8163,12 @@ def add_tx():
                 return jsonify({'ok': False, 'error': 'Faltan campos requeridos'}), 400
             amount = float(body['amount'])
             codigo = str(body.get('tarjeta_codigo',''))
+
+            # Normalizar nombre: si ya existe alguien con ese nombre (distinto case), usar el canónico
+            raw_name = str(body['name']).strip()
+            existing_names = {t['name'] for t in data.get('transactions', [])}
+            canonical_name = next((n for n in existing_names if n.lower() == raw_name.lower()), raw_name)
+
             if codigo:
                 if 'tarjetas' not in data: data['tarjetas'] = {}
                 if codigo not in data['tarjetas']:
@@ -7807,14 +8178,14 @@ def add_tx():
                         saldo_ini = float(conf['saldo_inicial']) if conf and conf.get('saldo_inicial') not in ('', None) else 0
                     except (ValueError, TypeError):
                         saldo_ini = 0
-                    data['tarjetas'][codigo] = {'saldo_actual': saldo_ini, 'nombre': str(body['name'])}
+                    data['tarjetas'][codigo] = {'saldo_actual': saldo_ini, 'nombre': canonical_name}
                 saldo_disponible = data['tarjetas'][codigo]['saldo_actual']
                 if saldo_disponible < amount:
                     return jsonify({'ok': False, 'error': 'Saldo insuficiente. Disponible: $' + str(int(saldo_disponible))}), 400
             data['tx_id_counter'] += 1
             tx = {
                 'id': data['tx_id_counter'],
-                'name': str(body['name']).strip(),
+                'name': canonical_name,
                 'amount': amount,
                 'caja': int(body['caja']),
                 'mesa': str(body.get('mesa','')),
@@ -7825,7 +8196,7 @@ def add_tx():
             data['transactions'].append(tx)
             if codigo:
                 data['tarjetas'][codigo]['saldo_actual'] -= amount
-                data['tarjetas'][codigo]['nombre'] = tx['name']
+                data['tarjetas'][codigo]['nombre'] = canonical_name
             save_data(data)
         return jsonify({'ok': True})
     except Exception as e:
@@ -8680,6 +9051,7 @@ import werkzeug.utils as _wu
 def pub_estado():
     import time as _t
     return jsonify({
+        'mostrar_ts': _state.get('publicidad_mostrar_ts', 0),
         'activa': _state['publicidad_activa'],
         'url': _state['publicidad_url'],
         'frecuencia': _state['publicidad_frecuencia'],
