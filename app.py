@@ -968,9 +968,8 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
       </div>
     </div>
   </div>
-  <!-- Aviso Railway -->
-  <div style="background:#1a0a00;border:1px solid #a85000;border-radius:8px;padding:12px 18px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#e8a060;letter-spacing:0.5px;line-height:1.6;">
-    ⚠️ <strong>En Railway:</strong> Si subís un archivo, se borra al reiniciar el servidor porque Railway no tiene filesystem persistente. <strong>Usá siempre una URL externa</strong> (Google Drive, Dropbox, etc.) para que funcione siempre. Si tenés un Railway Volume montado en <code>/data</code>, la subida sí persiste.
+  <div style="background:#1a0a00;border:1px solid #3a2000;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#c9a227;letter-spacing:0.5px;">
+    💡 Usá siempre una <strong>URL externa</strong> para el video (no subas desde la PC).
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
     <!-- URL externa -->
@@ -5473,7 +5472,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <!-- Publicidad overlay -->
 <div id="pub-overlay">
   <button onclick="cerrarPublicidad()" style="position:fixed;top:18px;right:22px;z-index:10502;background:rgba(0,0,0,0.7);color:#aaa;border:1px solid #444;font-size:22px;cursor:pointer;border-radius:8px;width:40px;height:40px;line-height:1;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">✕</button>
-  <video id="pub-video" autoplay playsinline muted style="display:none;width:100%;height:100%;object-fit:contain;background:#000;"></video>
+  <video id="pub-video" autoplay playsinline style="display:none;width:100%;height:100%;object-fit:contain;background:#000;"></video>
   <iframe id="pub-iframe" allow="autoplay;fullscreen" allowfullscreen style="display:none;width:100%;height:100%;border:none;"></iframe>
 </div>
 
@@ -5491,7 +5490,7 @@ let pubActiva = false;
 let _designWinnerMsg = '¡EL GANADOR DE LA NOCHE!';
 let _designWinnerSub = '';
 let pubFrecuenciaMs = 15 * 60 * 1000;
-let pubLastShown = 0;
+let pubLastShown = parseInt(localStorage.getItem('pubLastShown') || '0');
 
 function fmt(n){return '$'+Number(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});}
 
@@ -5913,6 +5912,7 @@ function mostrarPublicidadSync(url, offsetSegundos) {
   const iframe = document.getElementById('pub-iframe');
   if (!overlay) return;
   pubLastShown = Date.now();
+  localStorage.setItem('pubLastShown', pubLastShown);
   if (iframe) { iframe.style.display='none'; iframe.src=''; }
   video.style.display='block';
   overlay.classList.add('show');
@@ -5934,7 +5934,7 @@ function mostrarPublicidadSync(url, offsetSegundos) {
     video.load();
   }
   video.onended = cerrarPublicidad;
-  video.onerror = null;
+  video.onerror = function() { cerrarPublicidad(); };
   // Safety timeout: auto-close after 3 minutes max
   clearTimeout(window._pubSafetyTimer);
   window._pubSafetyTimer = setTimeout(cerrarPublicidad, 3 * 60 * 1000);
