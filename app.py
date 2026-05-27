@@ -1153,7 +1153,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <div id="pub-overlay" style="display:none;position:fixed;inset:0;z-index:10500;background:rgba(0,0,0,0.9);align-items:center;justify-content:center;">
   <div style="background:#000;border-radius:14px;overflow:hidden;width:min(90vw,960px);aspect-ratio:16/9;position:relative;box-shadow:0 0 80px rgba(0,0,0,0.9);">
     <button onclick="cerrarPublicidadOverlay(true)" style="position:absolute;top:10px;right:12px;z-index:10502;background:rgba(0,0,0,0.7);color:#ccc;border:1px solid #444;font-size:18px;cursor:pointer;border-radius:6px;width:32px;height:32px;line-height:1;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#ccc'">✕</button>
-    <video id="pub-video" autoplay playsinline style="width:100%;height:100%;object-fit:contain;display:none;background:#000;"></video>
+    <video id="pub-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;display:none;background:#000;"></video>
     <iframe id="pub-iframe" style="width:100%;height:100%;border:none;display:none;" allowfullscreen allow="autoplay;fullscreen"></iframe>
   </div>
 </div>
@@ -5473,7 +5473,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <!-- Publicidad overlay -->
 <div id="pub-overlay">
   <button onclick="cerrarPublicidad()" style="position:fixed;top:18px;right:22px;z-index:10502;background:rgba(0,0,0,0.7);color:#aaa;border:1px solid #444;font-size:22px;cursor:pointer;border-radius:8px;width:40px;height:40px;line-height:1;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">✕</button>
-  <video id="pub-video" autoplay playsinline style="display:none;width:100%;height:100%;object-fit:contain;background:#000;"></video>
+  <video id="pub-video" autoplay playsinline muted style="display:none;width:100%;height:100%;object-fit:contain;background:#000;"></video>
   <iframe id="pub-iframe" allow="autoplay;fullscreen" allowfullscreen style="display:none;width:100%;height:100%;border:none;"></iframe>
 </div>
 
