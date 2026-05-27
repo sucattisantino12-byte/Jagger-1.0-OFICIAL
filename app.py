@@ -989,7 +989,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
     <!-- Subir archivo -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;opacity:0.7;">
       <div style="font-family:'Oswald',sans-serif;font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">⚠️ Subir archivo mp4</div>
-      <div style="font-size:12px;color:#a85000;margin-bottom:12px;font-family:'Rajdhani',sans-serif;font-weight:700;">Solo funciona si tenés Railway Volume en /data. Sin volumen, el archivo se borra al reiniciar.</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Subí un archivo .mp4 desde tu dispositivo.</div>
       <label class="field-label">Seleccioná un archivo mp4</label>
       <input id="pub-file" type="file" accept="video/mp4,.mp4" style="width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;margin-bottom:14px;" />
       <button onclick="subirVideoPublicidad()" class="btn-add">⬆ Subir y usar este video</button>
@@ -5892,9 +5892,9 @@ async function checkPublicidad() {
       return;
     }
 
-    // Mostrar por frecuencia programada
+    // Mostrar por frecuencia programada (solo si ya se mostro antes y paso el intervalo)
     const now = Date.now();
-    if (now - pubLastShown >= pubFrecuenciaMs) {
+    if (pubLastShown > 0 && (now - pubLastShown) >= pubFrecuenciaMs) {
       mostrarPublicidad(d.url);
     }
   } catch(e){}
