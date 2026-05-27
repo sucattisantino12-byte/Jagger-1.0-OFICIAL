@@ -952,7 +952,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <div id="tab-publicidad" class="screen">
   <div class="conf-header">
     <div class="conf-title">📺 Sistema de publicidad</div>
-    <div class="conf-sub">Activá un video en la pantalla de presentación. Puede ser una URL externa o un archivo mp4 subido.</div>
+    <div class="conf-sub">Activá un video en la pantalla de presentación usando una URL directa a un archivo mp4.</div>
   </div>
   <!-- Tutorial desplegable -->
   <div style="margin-bottom:14px;">
@@ -962,19 +962,16 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
     <div id="tut-pub" style="display:none;background:#080800;border:1px solid #1a1a00;border-radius:0 0 8px 8px;padding:14px 18px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#aaa;line-height:1.8;">
       <div style="display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">①</span><span><strong style="color:#fff;">URL externa:</strong> Ingresá una URL directa a un archivo .mp4 y configurá cada cuántos minutos aparece en la pantalla de presentación.</span></div>
-        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">②</span><span><strong style="color:#fff;">Subir archivo:</strong> Subí un archivo .mp4 desde tu dispositivo para usarlo como publicidad.</span></div>
-        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">③</span><span><strong style="color:#fff;">Mostrar ahora:</strong> Envía el video inmediatamente a la pantalla de presentación sin esperar el intervalo configurado.</span></div>
-        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">④</span><span>La publicidad solo aparece en el modo presentación de la pantalla principal, no en las cajas.</span></div>
+        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">②</span><span><strong style="color:#fff;">Mostrar ahora:</strong> Envía el video inmediatamente a la pantalla de presentación sin esperar el intervalo configurado.</span></div>
+        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">③</span><span>La publicidad solo aparece en el modo presentación de la pantalla principal, no en las cajas.</span></div>
       </div>
     </div>
   </div>
-  <div style="background:#1a0a00;border:1px solid #3a2000;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#c9a227;letter-spacing:0.5px;">
-    💡 Usá siempre una <strong>URL externa</strong> para el video (no subas desde la PC).
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+  <div style="margin-bottom:20px;">
     <!-- URL externa -->
     <div style="background:var(--surface);border:1px solid #2a5a00;border-radius:10px;padding:18px 20px;">
-      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">✅ URL de video MP4 <span style="font-size:11px;color:#3a9a5a;letter-spacing:1px;">(RECOMENDADO)</span></div>
+      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">✅ URL de video MP4</div>
       <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Usá un link directo a un .mp4 (Google Drive link directo, Dropbox, servidor propio, etc.)</div>
       <label class="field-label">URL directa del video (.mp4)</label>
       <input id="pub-url" class="field-input" type="text" placeholder="https://ejemplo.com/video.mp4" />
@@ -985,15 +982,6 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
         <button onclick="mostrarAhora()" style="background:#1a3a1a;color:#3a9a5a;border:1px solid #2a5a2a;border-radius:7px;padding:10px 16px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px;" onmouseover="this.style.background='#223a22'" onmouseout="this.style.background='#1a3a1a'">📺 Mostrar ahora en pantalla</button>
         <button onclick="desactivarPublicidad()" style="background:transparent;color:#555;border:1px solid #222;border-radius:7px;padding:10px 16px;font-family:'Rajdhani',sans-serif;font-size:14px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#c9a227';this.style.color='#c9a227'" onmouseout="this.style.borderColor='#222';this.style.color='#555'">■ Desactivar</button>
       </div>
-    </div>
-    <!-- Subir archivo -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;opacity:0.7;">
-      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">⚠️ Subir archivo mp4</div>
-
-      <label class="field-label">Seleccioná un archivo mp4</label>
-      <input id="pub-file" type="file" accept="video/mp4,.mp4" style="width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;margin-bottom:14px;" />
-      <button onclick="subirVideoPublicidad()" class="btn-add">⬆ Subir y usar este video</button>
-      <div id="pub-upload-status" style="margin-top:10px;font-size:12px;color:#555;letter-spacing:1px;"></div>
     </div>
   </div>
   <div id="pub-estado-box" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;">
@@ -5490,7 +5478,7 @@ let pubActiva = false;
 let _designWinnerMsg = '¡EL GANADOR DE LA NOCHE!';
 let _designWinnerSub = '';
 let pubFrecuenciaMs = 15 * 60 * 1000;
-let pubLastShown = parseInt(localStorage.getItem('pubLastShown') || '0');
+let pubLastShown = Date.now(); // Siempre arrancar desde ahora — nunca mostrar automáticamente al recargar
 
 function fmt(n){return '$'+Number(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});}
 
@@ -5894,7 +5882,7 @@ async function checkPublicidad() {
 
     // Mostrar por frecuencia programada
     const now = Date.now();
-    if (pubLastShown > 0 && (now - pubLastShown) >= pubFrecuenciaMs) {
+    if (now - pubLastShown >= pubFrecuenciaMs) {
       mostrarPublicidad(d.url);
     }
   } catch(e){}
