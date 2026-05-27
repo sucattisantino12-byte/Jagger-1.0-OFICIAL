@@ -1153,7 +1153,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <div id="pub-overlay" style="display:none;position:fixed;inset:0;z-index:10500;background:rgba(0,0,0,0.9);align-items:center;justify-content:center;">
   <div style="background:#000;border-radius:14px;overflow:hidden;width:min(90vw,960px);aspect-ratio:16/9;position:relative;box-shadow:0 0 80px rgba(0,0,0,0.9);">
     <button onclick="cerrarPublicidadOverlay(true)" style="position:absolute;top:10px;right:12px;z-index:10502;background:rgba(0,0,0,0.7);color:#ccc;border:1px solid #444;font-size:18px;cursor:pointer;border-radius:6px;width:32px;height:32px;line-height:1;transition:color .2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#ccc'">✕</button>
-    <video id="pub-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;display:none;background:#000;"></video>
+    <video id="pub-video" autoplay playsinline style="width:100%;height:100%;object-fit:contain;display:none;background:#000;"></video>
     <iframe id="pub-iframe" style="width:100%;height:100%;border:none;display:none;" allowfullscreen allow="autoplay;fullscreen"></iframe>
   </div>
 </div>
@@ -5934,7 +5934,7 @@ function mostrarPublicidadSync(url, offsetSegundos) {
     video.load();
   }
   video.onended = cerrarPublicidad;
-  video.onerror = function() { cerrarPublicidad(); };
+  video.onerror = null;
   // Safety timeout: auto-close after 3 minutes max
   clearTimeout(window._pubSafetyTimer);
   window._pubSafetyTimer = setTimeout(cerrarPublicidad, 3 * 60 * 1000);
@@ -7589,8 +7589,7 @@ tr:hover td{background:#111;}
 <div class="top-bar">
   <span class="logo">RANKING VIP — HISTORIAL</span>
   <div style="display:flex;gap:10px;align-items:center;">
-    <a class="dl-btn" href="/api/export/excel" target="_blank">⬇ Excel</a>
-    <button class="dl-btn" id="gs-btn" onclick="syncGSheets()" style="cursor:pointer;border:none;">☁ Google Sheets</button>
+    <a class="dl-btn" href="/api/export/excel" target="_blank">⬇ Descargar Excel</a>
     <a class="back-btn" href="/">← Volver</a>
   </div>
 </div>
@@ -7845,31 +7844,6 @@ function renderRanking(periodo) {
 
 init();
 
-async function syncGSheets() {
-  const btn = document.getElementById('gs-btn');
-  const orig = btn.textContent;
-  btn.textContent = '⏳ Sincronizando...';
-  btn.disabled = true;
-  try {
-    const r = await fetch('/api/export/gsheets', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({modo:'all'})});
-    const d = await r.json();
-    if (d.ok) {
-      btn.textContent = '✓ Listo';
-      setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 2000);
-      if (confirm('¡Sincronizado! ¿Abrir la planilla en Google Sheets?')) window.open(d.url, '_blank');
-    } else {
-      btn.textContent = orig;
-      btn.disabled = false;
-      const setup = d.error && (d.error.includes('creds') || d.error.includes('GSHEETS')) ?
-        '\n\nPara configurar:\n1. Creá una cuenta de servicio en Google Cloud Console\n2. Descargá el JSON y guardalo como gsheets_creds.json junto al app.py\n3. Creá una planilla en Google Sheets y copiá el ID de la URL\n4. Seteá la variable de entorno GSHEETS_ID con ese ID\n5. Compartí la planilla con el email de la cuenta de servicio' : '';
-      alert('Error: ' + d.error + setup);
-    }
-  } catch(e) {
-    btn.textContent = orig;
-    btn.disabled = false;
-    alert('Error de conexión: ' + e.message);
-  }
-}
 </script>
 </body>
 </html>"""
@@ -8427,7 +8401,8 @@ def export_excel():
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-        from openpyxl.chart import BarChart, PieChart, LineChart, Reference
+        from openpyxl.chart import BarChart, LineChart, PieChart, Reference, Series
+        from openpyxl.chart.series import DataPoint
         from openpyxl.utils import get_column_letter
         from io import BytesIO
     except ImportError:
@@ -8439,355 +8414,456 @@ def export_excel():
 
     wb = Workbook()
 
-    # ── Estilos ──────────────────────────────────────────────────
-    GOLD  = PatternFill(start_color='C9A227', fill_type='solid')
-    DARK  = PatternFill(start_color='0D0D0D', fill_type='solid')
-    DARK2 = PatternFill(start_color='1A1A1A', fill_type='solid')
-    f_hdr  = Font(bold=True, color='000000', name='Calibri', size=11)
-    f_ti   = Font(bold=True, color='C9A227', name='Calibri', size=14)
-    f_gold = Font(bold=True, color='C9A227', name='Calibri', size=11)
-    f_gs   = Font(bold=True, color='C9A227', name='Calibri', size=10)
-    f_dim  = Font(color='CCCCCC', name='Calibri', size=10)
-    f_gray = Font(color='666666', name='Calibri', size=10)
-    f_kpi  = Font(bold=True, color='888888', name='Calibri', size=9)
-    thin   = Side(style='thin', color='2A2A2A')
-    BDR    = Border(left=thin, right=thin, top=thin, bottom=thin)
-    CTR    = Alignment(horizontal='center', vertical='center')
+    # ── Paleta única coherente ────────────────────────────────
+    GOLD    = 'C9A227'
+    GOLD_LT = 'F5E6A0'
+    BLACK   = '111111'
+    DARK    = '1E1E1E'
+    WHITE   = 'FFFFFF'
+    LGRAY   = 'F2F2F2'
+    MGRAY   = 'D9D9D9'
+    DGRAY   = '666666'
+    GREEN   = '1E6B3C'
+    GREEN_LT= 'D6EFDF'
+    RED     = 'A83030'
+    RED_LT  = 'F8D7DA'
+    BLUE    = '1A4A8A'
+    BLUE_LT = 'D0E4F7'
 
-    def set_hdr(ws, row, col_start, labels):
-        for ci, h in enumerate(labels, col_start):
-            c = ws.cell(row=row, column=ci, value=h)
-            c.font = f_hdr; c.fill = GOLD; c.alignment = CTR; c.border = BDR
+    def fill(c): return PatternFill('solid', fgColor=c)
+    def side(c='CCCCCC', s='thin'): return Side(style=s, color=c)
+    def border(c='CCCCCC'):
+        s = side(c); return Border(left=s, right=s, top=s, bottom=s)
+    def font(bold=False, color=BLACK, size=10, name='Calibri'):
+        return Font(bold=bold, color=color, size=size, name=name)
+    def align(h='left', v='center', wrap=False, indent=0):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap, indent=indent)
 
-    def set_row(ws, row, col_start, ncols, alt=False):
-        fill = DARK2 if alt else DARK
-        for ci in range(col_start, col_start + ncols):
-            c = ws.cell(row=row, column=ci)
-            c.fill = fill; c.font = f_dim; c.border = BDR; c.alignment = CTR
+    BDR      = border('CCCCCC')
+    BDR_GOLD = border(GOLD)
+    BDR_DK   = border('999999')
 
-    def nfmt(cell, v):
-        cell.value = v; cell.number_format = '#,##0'; return cell
+    def cell(ws, r, c, val, f=None, bg=None, bdr=None, al=None, fmt=None):
+        cc = ws.cell(row=r, column=c, value=val)
+        if f:   cc.font      = f
+        if bg:  cc.fill      = fill(bg)
+        if bdr: cc.border    = bdr
+        if al:  cc.alignment = al
+        if fmt: cc.number_format = fmt
+        return cc
 
-    # ════════════════════════════════════════════════════
-    # HOJA 1 — GENERAL
-    # ════════════════════════════════════════════════════
-    ws1 = wb.active; ws1.title = 'General'
-    ws1.sheet_view.showGridLines = False
-    ws1.sheet_properties.tabColor = 'C9A227'
+    def row_h(ws, r, h): ws.row_dimensions[r].height = h
+    def col_w(ws, c, w): ws.column_dimensions[get_column_letter(c)].width = w
 
-    total_all = sum(n['total'] for n in historial)
-    total_ops = sum(n['operaciones'] for n in historial)
+    def title_row(ws, r, text, sub=''):
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=12)
+        cc = ws.cell(row=r, column=1, value=text)
+        cc.font = Font(bold=True, color=GOLD, size=18, name='Calibri')
+        cc.fill = fill(BLACK); cc.alignment = align('left', indent=2)
+        row_h(ws, r, 40)
+        if sub:
+            ws.merge_cells(start_row=r+1, start_column=1, end_row=r+1, end_column=12)
+            sc = ws.cell(row=r+1, column=1, value=sub)
+            sc.font = Font(color=DGRAY, size=9, name='Calibri')
+            sc.fill = fill(BLACK); sc.alignment = align('left', indent=2)
+            row_h(ws, r+1, 15)
+
+    def section(ws, r, text, col_start=1, col_end=8):
+        ws.merge_cells(start_row=r, start_column=col_start, end_row=r, end_column=col_end)
+        cc = ws.cell(row=r, column=col_start, value=text)
+        cc.font = Font(bold=True, color=WHITE, size=10, name='Calibri')
+        cc.fill = fill(DARK); cc.alignment = align('left', indent=1)
+        row_h(ws, r, 20)
+
+    def header_row(ws, r, labels, col_start=1, bg=GOLD):
+        for ci, lbl in enumerate(labels, col_start):
+            cc = ws.cell(row=r, column=ci, value=lbl)
+            cc.font = Font(bold=True, color=BLACK, size=9, name='Calibri')
+            cc.fill = fill(bg); cc.border = BDR_GOLD
+            cc.alignment = align('center')
+        row_h(ws, r, 20)
+
+    def data_cell(ws, r, c, val, bold=False, alt=False, fmt=None, color=None, h='center'):
+        bg = LGRAY if alt else WHITE
+        f = font(bold=bold, color=color or BLACK)
+        al = align(h)
+        cc = ws.cell(row=r, column=c, value=val)
+        cc.font = f; cc.fill = fill(bg); cc.border = BDR; cc.alignment = al
+        if fmt: cc.number_format = fmt
+        row_h(ws, r, 17)
+        return cc
+
+    def money(ws, r, c, val, alt=False, bold=False, color=None):
+        data_cell(ws, r, c, val, bold=bold, alt=alt, fmt='#.##0', h='right', color=color or GREEN)
+
+    def pct(ws, r, c, val, alt=False):
+        data_cell(ws, r, c, val, alt=alt, fmt='0.0%', h='center')
+
+    def kpi_block(ws, r, c, label, value, fmt='#.##0', val_color=GREEN):
+        lc = ws.cell(row=r, column=c, value=label)
+        lc.font = Font(bold=False, color=DGRAY, size=8, name='Calibri')
+        lc.fill = fill(LGRAY); lc.border = border('E0E0E0')
+        lc.alignment = align('left', indent=1); row_h(ws, r, 22)
+        vc = ws.cell(row=r, column=c+1, value=value)
+        vc.font = Font(bold=True, color=val_color, size=12, name='Calibri')
+        vc.fill = fill(WHITE); vc.border = border('E0E0E0')
+        vc.alignment = align('right', indent=1)
+        if fmt: vc.number_format = fmt
+
+    # ── Pre-cálculos ─────────────────────────────────────────
+    total_all  = sum(n['total'] for n in historial)
+    total_ops  = sum(n['operaciones'] for n in historial)
+    avg_noche  = total_all / len(historial) if historial else 0
+    mejor      = max(n['total'] for n in historial) if historial else 0
+
     rk_all = {}
+    noches_cliente = {}
     for n in historial:
+        vistos = set()
         for rv in n.get('ranking', []):
-            rk_all[rv['name']] = rk_all.get(rv['name'], 0) + rv['total']
+            nm = rv['name']
+            rk_all[nm] = rk_all.get(nm, 0) + rv['total']
+            if nm not in vistos:
+                noches_cliente[nm] = noches_cliente.get(nm, 0) + 1
+                vistos.add(nm)
     rk_sorted = sorted(rk_all.items(), key=lambda x: -x[1])
+
     por_mes = {}
+    noches_mes = {}
     for n in historial:
         mes = n['fecha'][:7]
         por_mes[mes] = por_mes.get(mes, 0) + n['total']
+        noches_mes[mes] = noches_mes.get(mes, 0) + 1
     meses = sorted(por_mes.keys())
 
-    ws1['A1'] = 'JAGGER CLUB — HISTORIAL VIP'
-    ws1['A1'].font = Font(bold=True, color='C9A227', name='Calibri', size=16)
-    ws1['A2'] = f'Generado: {datetime.now().strftime("%d/%m/%Y %H:%M")}  ·  {len(historial)} noches registradas'
-    ws1['A2'].font = f_gray
-    for ri, (lbl, val) in enumerate([
-        ('TOTAL FACTURADO', f'${total_all:,.0f}'.replace(',', '.')),
-        ('NOCHES',          len(historial)),
-        ('OPERACIONES',     total_ops),
-    ], 4):
-        ws1.cell(row=ri, column=1, value=lbl).font = f_kpi
-        ws1.cell(row=ri, column=2, value=val).font = f_gold
-
-    ws1.cell(row=8, column=1, value='RANKING GENERAL').font = f_ti
-    set_hdr(ws1, 9, 1, ['#', 'Nombre', 'Total ($)'])
-    for i, (nm, tot) in enumerate(rk_sorted[:20], 1):
-        r = 9 + i
-        ws1.cell(row=r, column=1, value=i)
-        ws1.cell(row=r, column=2, value=nm)
-        nfmt(ws1.cell(row=r, column=3), tot)
-        set_row(ws1, r, 1, 3, alt=(i % 2 == 0))
-        if i == 1:
-            for ci in range(1, 4): ws1.cell(row=r, column=ci).font = f_gs
-
-    base = 11 + len(rk_sorted[:20])
-    ws1.cell(row=base, column=1, value='TOTAL POR MES').font = f_ti
-    set_hdr(ws1, base+1, 1, ['Mes', 'Total ($)'])
-    cd_start = base + 2
-    for i, mes in enumerate(meses):
-        ws1.cell(row=cd_start+i, column=1, value=mes)
-        nfmt(ws1.cell(row=cd_start+i, column=2), por_mes[mes])
-        set_row(ws1, cd_start+i, 1, 2, alt=(i % 2 == 0))
-    cd_end = cd_start + len(meses) - 1
-
-    if cd_end >= cd_start:
-        ch_bar = BarChart(); ch_bar.type='col'; ch_bar.title='Facturación por mes'
-        ch_bar.style=10; ch_bar.width=22; ch_bar.height=13
-        ch_bar.add_data(Reference(ws1, min_col=2, min_row=cd_start, max_row=cd_end))
-        ch_bar.set_categories(Reference(ws1, min_col=1, min_row=cd_start, max_row=cd_end))
-        ws1.add_chart(ch_bar, 'E8')
-
-    # Evolución noche a noche (tabla + LineChart debajo de los datos mensuales)
-    ev_start = cd_end + 3
-    ws1.cell(row=ev_start, column=1, value='EVOLUCIÓN NOCHE A NOCHE').font = f_ti
-    set_hdr(ws1, ev_start+1, 1, ['Fecha', 'Total ($)'])
-    ev_d_start = ev_start + 2
-    for i, n in enumerate(historial):
-        rr = ev_d_start + i
-        ws1.cell(row=rr, column=1, value=n['fecha'])
-        nfmt(ws1.cell(row=rr, column=2), n['total'])
-        set_row(ws1, rr, 1, 2, alt=(i % 2 == 0))
-    ev_d_end = ev_d_start + len(historial) - 1
-
-    if len(historial) >= 2:
-        ch_line = LineChart()
-        ch_line.title = 'Evolución noche a noche'
-        ch_line.style = 10; ch_line.width = 22; ch_line.height = 13
-        ch_line.add_data(Reference(ws1, min_col=2, min_row=ev_start+1, max_row=ev_d_end),
-                         titles_from_data=True)
-        ch_line.set_categories(Reference(ws1, min_col=1, min_row=ev_d_start, max_row=ev_d_end))
-        ws1.add_chart(ch_line, 'E' + str(ev_start))
-
-    ws1.column_dimensions['A'].width = 22
-    ws1.column_dimensions['B'].width = 26
-    ws1.column_dimensions['C'].width = 16
-
-    # ════════════════════════════════════════════════════
-    # HOJA 2 — NOCHES (tabla + autofilter)
-    # ════════════════════════════════════════════════════
-    ws2 = wb.create_sheet('Noches')
-    ws2.sheet_view.showGridLines = False
-    ws2.sheet_properties.tabColor = 'C9A227'
-    ws2['A1'] = 'HISTORIAL DE NOCHES'; ws2['A1'].font = f_ti
-
-    COLS_N = ['Fecha', 'Cierre', 'Total ($)', 'Ops', '1°', '2°', '3°', 'Abajo', 'Extendido', 'VIP']
-    set_hdr(ws2, 3, 1, COLS_N)
-    r2 = 4
-    for idx, n in enumerate(reversed(historial)):
-        rnk = n.get('ranking', []); pc = n.get('por_caja', {})
-        ws2.cell(row=r2, column=1, value=n['fecha'])
-        ws2.cell(row=r2, column=2, value=n.get('hora_cierre', ''))
-        nfmt(ws2.cell(row=r2, column=3), n['total'])
-        ws2.cell(row=r2, column=4, value=n['operaciones'])
-        for ci, ridx in zip(range(5, 8), range(3)):
-            ws2.cell(row=r2, column=ci, value=rnk[ridx]['name'] if len(rnk) > ridx else '')
-        for ci, key in zip(range(8, 11), [1, 2, 3]):
-            nfmt(ws2.cell(row=r2, column=ci), pc.get(key, pc.get(str(key), 0)))
-        set_row(ws2, r2, 1, 10, alt=(idx % 2 == 0))
-        r2 += 1
-
-    ws2.auto_filter.ref = f'A3:J{r2-1}'
-    for ci, w in zip(range(1, 11), [13, 8, 14, 6, 22, 22, 22, 13, 13, 13]):
-        ws2.column_dimensions[get_column_letter(ci)].width = w
-
-    if rk_sorted:
-        top5 = rk_sorted[:5]; cc = 12
-        ws2.cell(row=3, column=cc, value='TOP 5 (todas las noches)').font = f_gold
-        set_hdr(ws2, 4, cc, ['Nombre', 'Total ($)'])
-        for i, (nm, tot) in enumerate(top5):
-            ws2.cell(row=5+i, column=cc, value=nm)
-            nfmt(ws2.cell(row=5+i, column=cc+1), tot)
-            set_row(ws2, 5+i, cc, 2, alt=(i % 2 == 0))
-        ch2 = BarChart(); ch2.type='bar'; ch2.title='Top 5 Clientes'
-        ch2.style=10; ch2.width=18; ch2.height=10
-        ch2.add_data(Reference(ws2, min_col=cc+1, min_row=4, max_row=4+len(top5)),
-                     titles_from_data=True)
-        ch2.set_categories(Reference(ws2, min_col=cc, min_row=5, max_row=4+len(top5)))
-        ws2.add_chart(ch2, get_column_letter(cc)+'11')
-
-    # ════════════════════════════════════════════════════
-    # HOJA 3 — ÚLTIMA NOCHE (detalle completo)
-    # ════════════════════════════════════════════════════
     ul = historial[-1]
-    ws3 = wb.create_sheet(f'Noche {ul["fecha"]}')
-    ws3.sheet_view.showGridLines = False
-    ws3.sheet_properties.tabColor = 'C9A227'
-    ws3['A1'] = f'DETALLE — {ul["fecha"]}'; ws3['A1'].font = f_ti
-    ws3['A2'] = f'Total: ${ul["total"]:,.0f}   ·   {ul["operaciones"]} operaciones'.replace(',', '.')
-    ws3['A2'].font = f_gold
-
-    ws3.cell(row=4, column=1, value='RANKING DE LA NOCHE').font = f_ti
-    set_hdr(ws3, 5, 1, ['#', 'Nombre', 'Mesa', 'Total ($)'])
-    r3 = 6
-    for i, rv in enumerate(ul.get('ranking', []), 1):
-        ws3.cell(row=r3, column=1, value=i)
-        ws3.cell(row=r3, column=2, value=rv['name'])
-        ws3.cell(row=r3, column=3, value=rv.get('mesa', ''))
-        nfmt(ws3.cell(row=r3, column=4), rv['total'])
-        set_row(ws3, r3, 1, 4, alt=(i % 2 == 0))
-        if i == 1:
-            for ci in range(1, 5): ws3.cell(row=r3, column=ci).font = f_gs
-        r3 += 1
-
-    # Por caja — barra + torta
-    r3 += 1
-    ws3.cell(row=r3, column=1, value='FACTURACIÓN POR CAJA').font = f_ti
-    set_hdr(ws3, r3+1, 1, ['Caja', 'Total ($)'])
     pc3 = ul.get('por_caja', {})
-    cs = r3 + 2
-    for i, cn in enumerate([1, 2, 3]):
-        ws3.cell(row=cs+i, column=1, value=CAJA_NOMBRES.get(cn, f'Caja {cn}'))
-        nfmt(ws3.cell(row=cs+i, column=2), pc3.get(cn, pc3.get(str(cn), 0)))
-        set_row(ws3, cs+i, 1, 2, alt=(i % 2 == 0))
+    cj  = [pc3.get(i, pc3.get(str(i), 0)) for i in [1,2,3]]
+    if not any(cj):
+        ops_cj = [{},{},[0,0,0]][0]
+        for t in ul.get('transactions', []):
+            k = int(t.get('caja', 1)) - 1
+            if 0 <= k <= 2: cj[k] = cj[k] + t['amount']
 
-    ch3_bar = BarChart(); ch3_bar.type='col'; ch3_bar.title='Por caja'
-    ch3_bar.style=10; ch3_bar.width=14; ch3_bar.height=10
-    ch3_bar.add_data(Reference(ws3, min_col=2, min_row=cs, max_row=cs+2))
-    ch3_bar.set_categories(Reference(ws3, min_col=1, min_row=cs, max_row=cs+2))
-    ws3.add_chart(ch3_bar, 'F4')
+    ops_cj = [0, 0, 0]
+    for t in ul.get('transactions', []):
+        k = int(t.get('caja', 1)) - 1
+        if 0 <= k <= 2: ops_cj[k] += 1
 
-    ch3_pie = PieChart()
-    ch3_pie.title = 'Distribución por caja'; ch3_pie.style = 10
-    ch3_pie.width = 14; ch3_pie.height = 10
-    ch3_pie.add_data(Reference(ws3, min_col=2, min_row=cs-1, max_row=cs+2), titles_from_data=True)
-    ch3_pie.set_categories(Reference(ws3, min_col=1, min_row=cs, max_row=cs+2))
-    ws3.add_chart(ch3_pie, 'F' + str(cs + 4))
+    medal_color = {1: GOLD, 2: '9E9E9E', 3: 'CD7F32'}
 
-    # Todas las operaciones
-    r3 = cs + 5
-    ws3.cell(row=r3, column=1, value='TODAS LAS OPERACIONES').font = f_ti
-    set_hdr(ws3, r3+1, 1, ['Hora', 'Nombre', 'Mesa', 'Monto ($)', 'Caja', 'Items'])
-    r3 += 2
-    for i, t in enumerate(ul.get('transactions', [])):
-        ws3.cell(row=r3, column=1, value=t.get('time', ''))
-        ws3.cell(row=r3, column=2, value=t['name'])
-        ws3.cell(row=r3, column=3, value=t.get('mesa', ''))
-        nfmt(ws3.cell(row=r3, column=4), t['amount'])
-        caja_num = int(t.get('caja', 1))
-        ws3.cell(row=r3, column=5, value=CAJA_NOMBRES.get(caja_num, f'Caja {caja_num}'))
-        items_str = ', '.join(f"{it.get('cantidad', it.get('qty', 1))}x {it['nombre']}" for it in t.get('items', []))
-        ws3.cell(row=r3, column=6, value=items_str)
-        set_row(ws3, r3, 1, 6, alt=(i % 2 == 0))
-        r3 += 1
+    # ════════════════════════════════════════════════════════
+    # HOJA 1 — RESUMEN GENERAL
+    # ════════════════════════════════════════════════════════
+    ws1 = wb.active
+    ws1.title = 'Resumen'
+    ws1.sheet_view.showGridLines = False
+    ws1.sheet_properties.tabColor = GOLD
+    ws1.freeze_panes = 'A4'
 
-    for ci, w in enumerate([10, 26, 8, 14, 10, 40], 1):
-        ws3.column_dimensions[get_column_letter(ci)].width = w
+    title_row(ws1, 1,
+        'JAGGER CLUB — RESUMEN GENERAL',
+        f'Exportado el {datetime.now().strftime("%d/%m/%Y %H:%M")}  ·  {len(historial)} noche(s) registrada(s)')
 
+    # KPIs fila 3 (3 pares lado a lado)
+    ws1.row_dimensions[3].height = 6
+    kpi_block(ws1, 4, 1, 'TOTAL FACTURADO',    total_all,   '#.##0')
+    kpi_block(ws1, 4, 3, 'NOCHES',             len(historial), 'General', BLUE)
+    kpi_block(ws1, 4, 5, 'OPERACIONES',        total_ops,   'General', BLUE)
+    kpi_block(ws1, 5, 1, 'PROMEDIO / NOCHE',   avg_noche,   '#.##0')
+    kpi_block(ws1, 5, 3, 'PROM / OPERACIÓN',   total_all/total_ops if total_ops else 0, '#.##0')
+    kpi_block(ws1, 5, 5, 'MEJOR NOCHE',        mejor,       '#.##0')
+    ws1.row_dimensions[6].height = 8
+
+    # Ranking general
+    section(ws1, 7, '  RANKING GENERAL — TOP 20', 1, 5)
+    header_row(ws1, 8, ['#', 'CLIENTE', 'TOTAL ($)', '% DEL TOTAL', 'NOCHES'], 1, GOLD)
+    for i, (nm, tot) in enumerate(rk_sorted[:20], 1):
+        alt = (i % 2 == 0)
+        mc = medal_color.get(i)
+        data_cell(ws1, 8+i, 1, f'#{i}', bold=i<=3, alt=alt, h='center', color=mc)
+        data_cell(ws1, 8+i, 2, nm,      bold=i<=3, alt=alt, h='left',   color=mc)
+        money(ws1, 8+i, 3, tot, alt=alt, bold=i<=3, color=mc)
+        pct(ws1, 8+i, 4, tot/total_all if total_all else 0, alt=alt)
+        data_cell(ws1, 8+i, 5, noches_cliente.get(nm, 0), alt=alt, h='center')
+
+    base = 10 + len(rk_sorted[:20])
+    ws1.row_dimensions[base].height = 10
+
+    # Por mes
+    section(ws1, base+1, '  FACTURACIÓN POR MES', 1, 5)
+    header_row(ws1, base+2, ['MES', 'TOTAL ($)', '% DEL TOTAL', 'NOCHES', 'PROM/NOCHE'], 1, GOLD)
+    ms = base + 3
+    for i, mes in enumerate(meses):
+        alt = (i%2==0)
+        data_cell(ws1, ms+i, 1, mes, alt=alt)
+        money(ws1, ms+i, 2, por_mes[mes], alt=alt)
+        pct(ws1, ms+i, 3, por_mes[mes]/total_all if total_all else 0, alt=alt)
+        data_cell(ws1, ms+i, 4, noches_mes.get(mes,0), alt=alt, h='center')
+        money(ws1, ms+i, 5, por_mes[mes]/noches_mes[mes] if noches_mes.get(mes) else 0, alt=alt)
+    ms_end = ms + len(meses) - 1
+
+    # Evolución noche a noche — tabla completa
+    ev = ms_end + 3
+    ws1.row_dimensions[ev].height = 10
+    section(ws1, ev+1, '  EVOLUCIÓN NOCHE A NOCHE', 1, 5)
+    header_row(ws1, ev+2, ['FECHA', 'TOTAL ($)', 'OPS', 'PROM/OP ($)', 'CAJA TOP'], 1, GOLD)
+    ev_d = ev + 3
+    for i, n in enumerate(historial):
+        alt = (i%2==0)
+        data_cell(ws1, ev_d+i, 1, n['fecha'], alt=alt)
+        money(ws1, ev_d+i, 2, n['total'], alt=alt)
+        data_cell(ws1, ev_d+i, 3, n['operaciones'], alt=alt, h='center')
+        money(ws1, ev_d+i, 4, n['total']/n['operaciones'] if n['operaciones'] else 0, alt=alt)
+        pc = n.get('por_caja', {}); top = max(pc, key=lambda k: pc[k], default='—')
+        data_cell(ws1, ev_d+i, 5, CAJA_NOMBRES.get(int(top) if str(top).isdigit() else 0, str(top)), alt=alt)
+    ev_end = ev_d + len(historial) - 1
+
+    # ── Gráfico evolución — UNA línea, un punto por noche, colores distintos por marcador ──
+    # El gráfico va DEBAJO de todas las tablas
+    chart_anchor_row = ev_end + 3
+    ws1.row_dimensions[chart_anchor_row].height = 8
+
+    EVOL_COLORS = ['C9A227','1A4A8A','1E6B3C','A83030','7B4EA0',
+                   '4A6B8A','C87320','1E5A4A','6B1A3A','2A3A6B',
+                   '3A6A9A','4A9A3A','C94A27','9A27C9','6B3A1A']
+
+    if len(historial) >= 1:
+        # Una sola serie = la línea que sube/baja
+        ch_l = LineChart()
+        ch_l.title = 'Evolución noche a noche'
+        ch_l.style = 10
+        ch_l.width = 28; ch_l.height = 14
+        ch_l.y_axis.numFmt = '#,##0'
+        ch_l.y_axis.title = 'Total ($)'
+        ch_l.x_axis.title = 'Noche'
+
+        # Datos: todos los totales en una sola serie
+        ch_l.add_data(Reference(ws1, min_col=2, min_row=ev+2, max_row=ev_end),
+                      titles_from_data=True)
+        ch_l.set_categories(Reference(ws1, min_col=1, min_row=ev_d, max_row=ev_end))
+
+        # Línea dorada
+        s = ch_l.series[0]
+        s.graphicalProperties.line.solidFill = GOLD
+        s.graphicalProperties.line.width = 22000
+
+        # Marcadores — color diferente por punto usando DataPoint
+        s.marker.symbol = 'circle'
+        s.marker.size = 10
+        s.marker.graphicalProperties.solidFill = GOLD
+        s.marker.graphicalProperties.ln.solidFill = BLACK
+
+        for i in range(len(historial)):
+            pt = DataPoint(idx=i)
+            c = EVOL_COLORS[i % len(EVOL_COLORS)]
+            pt.marker = s.marker.__class__()
+            pt.marker.symbol = 'circle'
+            pt.marker.size = 10
+            pt.marker.graphicalProperties.solidFill = c
+            pt.marker.graphicalProperties.ln.solidFill = BLACK
+            s.dPt.append(pt)
+
+        ws1.add_chart(ch_l, f'A{chart_anchor_row}')
+
+    # Anchos generosos — elimina todos los ####
+    for c, w in enumerate([18, 16, 18, 16, 18, 16, 1, 18, 18, 18, 18, 18], 1):
+        col_w(ws1, c, w)
+
+    # ════════════════════════════════════════════════════════
+    # HOJA 2 — HISTORIAL DE NOCHES
+    # ════════════════════════════════════════════════════════
+    ws2 = wb.create_sheet('Historial')
+    ws2.sheet_view.showGridLines = False
+    ws2.sheet_properties.tabColor = DARK
+    ws2.freeze_panes = 'A4'
+
+    title_row(ws2, 1, 'HISTORIAL DE NOCHES',
+        f'{len(historial)} noche(s)  ·  Acumulado: ${total_all:,.0f}'.replace(',','.'))
+
+    cols2 = ['FECHA', 'HORA CIERRE', 'TOTAL ($)', 'OPS', 'PROM/OP ($)', '1° LUGAR', '2° LUGAR', '3° LUGAR', 'CAJA ABAJO ($)', 'CAJA EXT ($)', 'CAJA VIP ($)']
+    header_row(ws2, 3, cols2, 1, DARK)
+    # fix: re-apply white font since DARK bg
+    for ci in range(1, len(cols2)+1):
+        ws2.cell(row=3, column=ci).font = Font(bold=True, color=WHITE, size=9, name='Calibri')
+
+    for idx, n in enumerate(reversed(historial)):
+        r = 4 + idx; alt = (idx%2==0)
+        pc = n.get('por_caja', {})
+        rk = sorted(n.get('ranking', []), key=lambda x: -x['total'])
+        def top(pos): return rk[pos]['name'] if len(rk) > pos else '—'
+        vals = [
+            n['fecha'], n.get('hora_cierre','—'), n['total'], n['operaciones'],
+            n['total']/n['operaciones'] if n['operaciones'] else 0,
+            top(0), top(1), top(2),
+            pc.get(1, pc.get('1',0)), pc.get(2, pc.get('2',0)), pc.get(3, pc.get('3',0))
+        ]
+        fmts = [None, None, '#.##0', 'General', '#.##0', None, None, None, '#.##0', '#.##0', '#.##0']
+        cols_color = [None, None, GREEN, BLUE, GREEN, medal_color.get(1), medal_color.get(2), medal_color.get(3), GREEN, GREEN, GREEN]
+        for ci, (v, fmt, cc) in enumerate(zip(vals, fmts, cols_color), 1):
+            bg = LGRAY if alt else WHITE
+            c2 = ws2.cell(row=r, column=ci, value=v)
+            c2.font = Font(bold=ci in [1,3], color=cc or BLACK, size=9, name='Calibri')
+            c2.fill = fill(bg); c2.border = BDR
+            c2.alignment = align('right' if fmt=='#.##0' else 'center')
+            if fmt: c2.number_format = fmt
+            row_h(ws2, r, 17)
+
+    for c, w in enumerate([13, 12, 16, 7, 16, 20, 20, 20, 16, 16, 16], 1):
+        col_w(ws2, c, w)
+
+    # ════════════════════════════════════════════════════════
+    # HOJAS POR NOCHE — una hoja por cada noche del mes actual
+    # ════════════════════════════════════════════════════════
+    mes_actual = datetime.now().strftime('%Y-%m')
+    noches_mes = [n for n in historial if n['fecha'].startswith(mes_actual)]
+    if not noches_mes:
+        noches_mes = historial  # fallback: todas las noches
+
+    def make_noche_sheet(n, sheet_name):
+        ws = wb.create_sheet(sheet_name)
+        ws.sheet_view.showGridLines = False
+        ws.sheet_properties.tabColor = GOLD
+        ws.freeze_panes = 'A5'
+
+        # Datos de la noche
+        pc = n.get('por_caja', {})
+        cj_n = [pc.get(i, pc.get(str(i), 0)) for i in [1,2,3]]
+        t_n  = n['total']; ops_n = n['operaciones']
+        if not any(cj_n):
+            for t in n.get('transactions', []):
+                k = int(t.get('caja', 1)) - 1
+                if 0 <= k <= 2: cj_n[k] += t['amount']
+        ops_cj_n = [0, 0, 0]
+        for t in n.get('transactions', []):
+            k = int(t.get('caja', 1)) - 1
+            if 0 <= k <= 2: ops_cj_n[k] += 1
+
+        title_row(ws, 1, f'DETALLE — {n["fecha"]}',
+            f'Cierre: {n.get("hora_cierre","—")}  ·  Total: ${t_n:,.0f}  ·  {ops_n} ops  ·  Prom/op: ${t_n/ops_n:,.0f}'.replace(',','.'))
+        ws.row_dimensions[3].height = 6
+
+        # KPIs — etiquetas completas sin truncar
+        kpi_block(ws, 4, 1, 'TOTAL NOCHE',     t_n,   '#.##0')
+        kpi_block(ws, 4, 3, 'OPERACIONES',      ops_n, 'General', BLUE)
+        kpi_block(ws, 4, 5, 'PROMEDIO / OP',    t_n/ops_n if ops_n else 0, '#.##0')
+        kpi_block(ws, 5, 1, 'CAJA ABAJO',       cj_n[0], '#.##0')
+        kpi_block(ws, 5, 3, 'CAJA EXTENDIDO',   cj_n[1], '#.##0')
+        kpi_block(ws, 5, 5, 'CAJA VIP',         cj_n[2], '#.##0')
+        ws.row_dimensions[6].height = 8
+
+        # ── Ranking de la noche ──────────────────────────────
+        section(ws, 7, '  RANKING DE LA NOCHE', 1, 5)
+        header_row(ws, 8, ['#', 'CLIENTE', 'MESA', 'TOTAL ($)', '% DEL TOTAL'], 1, GOLD)
+        rk_n = n.get('ranking', [])
+        for i, rv in enumerate(rk_n, 1):
+            alt = (i%2==0); mc = medal_color.get(i)
+            data_cell(ws, 8+i, 1, f'#{i}',           bold=i<=3, alt=alt, h='center', color=mc)
+            data_cell(ws, 8+i, 2, rv['name'],         bold=i<=3, alt=alt, h='left',   color=mc)
+            data_cell(ws, 8+i, 3, rv.get('mesa','—'), alt=alt, h='center')
+            money(ws, 8+i, 4, rv['total'], alt=alt, bold=i<=3, color=mc)
+            pct(ws, 8+i, 5, rv['total']/t_n if t_n else 0, alt=alt)
+
+        # ── Distribución por caja — con pie chart bien posicionado ──
+        dist_start = 10 + len(rk_n)
+        ws.row_dimensions[dist_start].height = 8
+        section(ws, dist_start+1, '  DISTRIBUCIÓN POR CAJA', 1, 5)
+        header_row(ws, dist_start+2, ['CAJA', 'TOTAL ($)', '% DEL TOTAL', 'OPS', 'PROM/OP ($)'], 1, GOLD)
+        cs = dist_start + 3
+        caja_names_l  = ['Caja Abajo', 'Caja Extendido', 'Caja VIP']
+        caja_colors_l = [BLUE, GREEN, GOLD]
+        for i in range(3):
+            alt = (i%2==0)
+            data_cell(ws, cs+i, 1, caja_names_l[i], bold=True, alt=alt, h='left', color=caja_colors_l[i])
+            money(ws, cs+i, 2, cj_n[i], alt=alt, color=caja_colors_l[i])
+            pct(ws, cs+i, 3, cj_n[i]/t_n if t_n else 0, alt=alt)
+            data_cell(ws, cs+i, 4, ops_cj_n[i], alt=alt, h='center')
+            money(ws, cs+i, 5, cj_n[i]/ops_cj_n[i] if ops_cj_n[i] else 0, alt=alt)
+
+        # ── Todas las operaciones ────────────────────────────
+        op_start = cs + 5
+        ws.row_dimensions[op_start].height = 8
+        section(ws, op_start+1, '  TODAS LAS OPERACIONES', 1, 6)
+        header_row(ws, op_start+2, ['HORA', 'CLIENTE', 'MESA', 'MONTO ($)', 'CAJA', 'PRODUCTOS'], 1, DARK)
+        for ci in range(1, 7):
+            ws.cell(row=op_start+2, column=ci).font = Font(bold=True, color=WHITE, size=9, name='Calibri')
+        txs_n = n.get('transactions', [])
+        for i, t in enumerate(txs_n):
+            alt = (i%2==0)
+            data_cell(ws, op_start+3+i, 1, t.get('time','—'), alt=alt)
+            data_cell(ws, op_start+3+i, 2, t['name'], bold=True, alt=alt, h='left', color=BLUE)
+            data_cell(ws, op_start+3+i, 3, t.get('mesa','—'), alt=alt)
+            money(ws, op_start+3+i, 4, t['amount'], alt=alt)
+            data_cell(ws, op_start+3+i, 5, CAJA_NOMBRES.get(int(t.get('caja',1)), '—'), alt=alt)
+            istr = ' · '.join(f"{it.get('cantidad',it.get('qty',1))}x {it['nombre']}" for it in t.get('items',[])) or '—'
+            cc2 = ws.cell(row=op_start+3+i, column=6, value=istr)
+            cc2.font = Font(color=DGRAY, size=9, name='Calibri')
+            cc2.fill = fill(LGRAY if alt else WHITE); cc2.border = BDR
+            cc2.alignment = align('left', indent=1); row_h(ws, op_start+3+i, 17)
+
+        # Pie chart — debajo de TODAS las tablas y operaciones
+        pie_anchor = op_start + 3 + len(txs_n) + 3
+        if any(cj_n):
+            ch_pie = PieChart(); ch_pie.title = 'Distribución por caja'; ch_pie.style = 10
+            ch_pie.width = 18; ch_pie.height = 12
+            ch_pie.add_data(Reference(ws, min_col=2, min_row=dist_start+2, max_row=cs+2), titles_from_data=True)
+            ch_pie.set_categories(Reference(ws, min_col=1, min_row=cs, max_row=cs+2))
+            for idx, color in enumerate([BLUE, GREEN, GOLD]):
+                pt = DataPoint(idx=idx)
+                pt.graphicalProperties.solidFill = color
+                ch_pie.series[0].dPt.append(pt)
+            ws.add_chart(ch_pie, f'A{pie_anchor}')
+
+        # Anchos — generosos para evitar palabras cortadas y ####
+        for c, w in enumerate([7, 24, 8, 16, 14, 44, 1, 18, 18, 18, 18, 18], 1):
+            col_w(ws, c, w)
+        # Columnas KPI (1-6): label + value pairs
+        for c, w in enumerate([18, 16, 18, 16, 18, 16], 1):
+            col_w(ws, c, w)
+
+    # Generar una hoja por cada noche del mes (más reciente primero)
+    for n in reversed(noches_mes):
+        try:
+            from datetime import datetime as _dt
+            d = _dt.strptime(n['fecha'], '%Y-%m-%d')
+            sname = d.strftime('%d-%m')
+        except Exception:
+            sname = n['fecha'][-5:].replace('-','/')
+        make_noche_sheet(n, sname)
+
+    # ════════════════════════════════════════════════════════
+    # HOJA — CLIENTES (siempre al final)
+    # ════════════════════════════════════════════════════════
+    ws4 = wb.create_sheet('Clientes')
+    ws4.sheet_view.showGridLines = False
+    ws4.sheet_properties.tabColor = BLUE
+    ws4.freeze_panes = 'A4'
+
+    title_row(ws4, 1, 'RANKING DE CLIENTES — HISTÓRICO',
+        f'{len(rk_sorted)} clientes únicos  ·  Total facturado: ${total_all:,.0f}'.replace(',','.'))
+
+    ws4.row_dimensions[3].height = 6
+    header_row(ws4, 3, ['#', 'CLIENTE', 'TOTAL HISTÓRICO ($)', '% DEL TOTAL', 'NOCHES', 'PROM/NOCHE ($)'], 1, DARK)
+    for ci in range(1, 7):
+        ws4.cell(row=3, column=ci).font = Font(bold=True, color=WHITE, size=9, name='Calibri')
+    for i, (nm, tot) in enumerate(rk_sorted, 1):
+        alt = (i%2==0); mc = medal_color.get(i); nn = noches_cliente.get(nm, 1)
+        data_cell(ws4, 3+i, 1, f'#{i}', bold=i<=3, alt=alt, h='center', color=mc)
+        data_cell(ws4, 3+i, 2, nm,      bold=i<=3, alt=alt, h='left',   color=mc)
+        money(ws4, 3+i, 3, tot, alt=alt, bold=i<=3, color=mc)
+        pct(ws4, 3+i, 4, tot/total_all if total_all else 0, alt=alt)
+        data_cell(ws4, 3+i, 5, nn, alt=alt, h='center')
+        money(ws4, 3+i, 6, tot/nn, alt=alt)
+    for c, w in enumerate([6, 24, 18, 12, 8, 14], 1): col_w(ws4, c, w)
+
+    # ── Generar y enviar ──────────────────────────────────────
     buf = BytesIO()
     wb.save(buf); buf.seek(0)
     from flask import send_file
-    fecha_str = datetime.now().strftime('%Y%m%d')
+    fecha_str = datetime.now().strftime('%Y%m%d_%H%M')
     return send_file(buf, as_attachment=True,
-                     download_name=f'jagger_{fecha_str}.xlsx',
+                     download_name=f'jagger_vip_{fecha_str}.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-@app.route('/api/export/gsheets', methods=['POST'])
-def export_gsheets():
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials as GCreds
-    except ImportError:
-        return jsonify({'ok': False, 'error': 'Instalá: pip install gspread google-auth'}), 500
-
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-    sheet_id = os.environ.get('GSHEETS_ID', '').strip()
-    creds_json_env = os.environ.get('GSHEETS_CREDS_JSON', '').strip()
-    creds_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gsheets_creds.json')
-
-    if not sheet_id:
-        return jsonify({'ok': False, 'error': 'Falta variable de entorno GSHEETS_ID con el ID del spreadsheet'}), 400
-    try:
-        if creds_json_env:
-            creds = GCreds.from_service_account_info(json.loads(creds_json_env), scopes=SCOPES)
-        elif os.path.exists(creds_file):
-            creds = GCreds.from_service_account_file(creds_file, scopes=SCOPES)
-        else:
-            return jsonify({'ok': False, 'error': 'Falta gsheets_creds.json o variable GSHEETS_CREDS_JSON'}), 400
-    except Exception as e:
-        return jsonify({'ok': False, 'error': f'Error en credenciales: {e}'}), 500
-
-    try:
-        gc = gspread.authorize(creds)
-        sh = gc.open_by_key(sheet_id)
-    except Exception as e:
-        return jsonify({'ok': False, 'error': f'No se pudo abrir el spreadsheet: {e}'}), 500
-
-    body = request.get_json() or {}
-    modo = body.get('modo', 'all')  # 'all' o 'last'
-    historial = load_historial()
-    if not historial:
-        return jsonify({'ok': False, 'error': 'Sin noches registradas aún'}), 400
-
-    noches_a_sincronizar = [historial[-1]] if modo == 'last' else historial
-
-    def safe_sheet(nombre):
-        try: return sh.worksheet(nombre)
-        except gspread.WorksheetNotFound: return sh.add_worksheet(title=nombre, rows=200, cols=12)
-
-    # ── Hoja RESUMEN ──────────────────────────────────────────
-    try:
-        ws_res = safe_sheet('Resumen')
-        ws_res.clear()
-        total_all = sum(n['total'] for n in historial)
-        rk_all = {}
-        for n in historial:
-            for r in n.get('ranking', []):
-                rk_all[r['name']] = rk_all.get(r['name'], 0) + r['total']
-        rk_sorted = sorted(rk_all.items(), key=lambda x: -x[1])
-        header_rows = [
-            ['JAGGER CLUB — HISTORIAL VIP', '', datetime.now().strftime('%d/%m/%Y %H:%M')],
-            [],
-            ['TOTAL ACUMULADO', f'${total_all:,.0f}'.replace(',', '.')],
-            ['NOCHES REGISTRADAS', len(historial)],
-            ['OPERACIONES', sum(n['operaciones'] for n in historial)],
-            [],
-            ['RANKING GENERAL'],
-            ['#', 'Nombre', 'Total ($)'],
-        ] + [[i+1, nm, tot] for i, (nm, tot) in enumerate(rk_sorted[:20])]
-        ws_res.update('A1', header_rows)
-    except Exception:
-        pass
-
-    # ── Hoja NOCHES ───────────────────────────────────────────
-    try:
-        ws_noches = safe_sheet('Noches')
-        ws_noches.clear()
-        n_header = [['Fecha', 'Cierre', 'Total ($)', 'Ops', '1°', '2°', '3°', 'Abajo', 'Extendido', 'VIP']]
-        n_rows = []
-        for n in reversed(historial):
-            rnk = n.get('ranking', [])
-            pc  = n.get('por_caja', {})
-            n_rows.append([
-                n['fecha'], n.get('hora_cierre',''), n['total'], n['operaciones'],
-                rnk[0]['name'] if len(rnk)>0 else '', rnk[1]['name'] if len(rnk)>1 else '', rnk[2]['name'] if len(rnk)>2 else '',
-                pc.get(1, pc.get('1', 0)), pc.get(2, pc.get('2', 0)), pc.get(3, pc.get('3', 0)),
-            ])
-        ws_noches.update('A1', n_header + n_rows)
-    except Exception:
-        pass
-
-    # ── Una hoja por noche ────────────────────────────────────
-    errores = []
-    for noche in noches_a_sincronizar:
-        try:
-            nombre_hoja = f"Noche {noche['fecha']}"
-            ws = safe_sheet(nombre_hoja)
-            ws.clear()
-            pc = noche.get('por_caja', {})
-            rows = [
-                [f"NOCHE {noche['fecha']} — cierre {noche.get('hora_cierre','?')} — Total: ${noche['total']:,.0f}".replace(',','.')],
-                [f"Abajo: ${pc.get(1,pc.get('1',0)):,.0f}  |  Extendido: ${pc.get(2,pc.get('2',0)):,.0f}  |  VIP: ${pc.get(3,pc.get('3',0)):,.0f}".replace(',','.')],
-                [],
-                ['RANKING', '', '', ''],
-                ['#', 'Nombre', 'Mesa', 'Total ($)'],
-            ] + [[i+1, r['name'], r.get('mesa',''), r['total']] for i, r in enumerate(noche.get('ranking',[]))] + [
-                [],
-                ['OPERACIONES', '', '', ''],
-                ['Hora', 'Nombre', 'Mesa', 'Monto ($)', 'Caja', 'Items'],
-            ] + [[t.get('time',''), t['name'], t.get('mesa',''), t['amount'],
-                  CAJA_NOMBRES.get(int(t.get('caja',1)), f"Caja {t.get('caja',1)}"),
-                  ', '.join(f"{it.get('cantidad', it.get('qty', 1))}x {it['nombre']}" for it in t.get('items',[]))]
-                 for t in noche.get('transactions',[])]
-            ws.update('A1', rows)
-        except Exception as e:
-            errores.append(str(e))
-
-    url = f'https://docs.google.com/spreadsheets/d/{sheet_id}'
-    msg = f'Sincronizado: {len(noches_a_sincronizar)} noche(s)'
-    if errores: msg += f' (errores: {len(errores)})'
-    return jsonify({'ok': True, 'url': url, 'msg': msg})
-
 @app.route('/api/tarjetas/recargar', methods=['POST'])
 def recargar_tarjeta():
     body = request.get_json() or {}
