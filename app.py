@@ -988,6 +988,8 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
     </div>
     <!-- Subir archivo -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;opacity:0.7;">
+      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">⚠️ Subir archivo mp4</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Subí un archivo .mp4 desde tu dispositivo.</div>
       <label class="field-label">Seleccioná un archivo mp4</label>
       <input id="pub-file" type="file" accept="video/mp4,.mp4" style="width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;margin-bottom:14px;" />
       <button onclick="subirVideoPublicidad()" class="btn-add">⬆ Subir y usar este video</button>
@@ -4073,7 +4075,7 @@ async function subirVideoPublicidad() {
 // ══════════════════════════════════════════
 //  PUBLICIDAD — Polling en pantalla de presentación
 // ══════════════════════════════════════════
-let pubLastActiva = null; // null = estado desconocido (primer poll aun no ejecutado)
+let pubLastActiva = false;
 let pubCloseTimer = null;
 
 async function pollPublicidad() {
@@ -4082,16 +4084,8 @@ async function pollPublicidad() {
     const d = await r.json();
     const overlay = document.getElementById('pub-overlay');
     if (!overlay) return;
-
-    if (pubLastActiva === null) {
-      // Primera vez: solo inicializar estado sin mostrar overlay
-      // Si ya estaba activa antes de recargar, no mostrar hasta que checkPublicidad la dispare
-      pubLastActiva = d.publicidad_activa;
-      return;
-    }
-
     if (d.publicidad_activa && !pubLastActiva) {
-      // Activar solo cuando cambia de inactiva a activa
+      // Activar
       pubLastActiva = true;
       const video = document.getElementById('pub-video');
       const iframe = document.getElementById('pub-iframe');
@@ -4108,7 +4102,6 @@ async function pollPublicidad() {
       if (pubCloseTimer) clearTimeout(pubCloseTimer);
       pubCloseTimer = setTimeout(() => cerrarPublicidadOverlay(false), seg * 1000);
     } else if (!d.publicidad_activa && pubLastActiva) {
-      pubLastActiva = false;
       cerrarPublicidadOverlay(false);
     }
   } catch(e) {}
@@ -5899,9 +5892,9 @@ async function checkPublicidad() {
       return;
     }
 
-    // Mostrar por frecuencia programada
+    // Mostrar por frecuencia programada (solo si ya se mostro antes y paso el intervalo)
     const now = Date.now();
-    if (now - pubLastShown >= pubFrecuenciaMs) {
+    if (pubLastShown > 0 && (now - pubLastShown) >= pubFrecuenciaMs) {
       mostrarPublicidad(d.url);
     }
   } catch(e){}
