@@ -968,6 +968,17 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
       </div>
     </div>
   </div>
+  <!-- Aviso AdBlock -->
+  <div style="background:#1a0000;border:2px solid #8a1a00;border-radius:10px;padding:14px 18px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;display:flex;align-items:flex-start;gap:12px;">
+    <span style="font-size:26px;flex-shrink:0;line-height:1;">🚫</span>
+    <div>
+      <div style="font-size:14px;font-weight:700;color:#ff6633;letter-spacing:1px;margin-bottom:4px;">DESACTIVÁ TU ADBLOCK</div>
+      <div style="font-size:13px;color:#cc5533;line-height:1.6;">Para que la publicidad funcione correctamente en la pantalla de presentación, <strong style="color:#ffaa88;">desactivá el bloqueador de publicidad</strong> (AdBlock, uBlock Origin, etc.) en este sitio. Si el video no reproduce, ese es el motivo.</div>
+    </div>
+  </div>
+  <div style="background:#1a0a00;border:1px solid #3a2000;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#c9a227;letter-spacing:0.5px;">
+    💡 Usá siempre una <strong>URL externa</strong> para el video (no subas desde la PC).
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
     <!-- URL externa -->
     <div style="background:var(--surface);border:1px solid #2a5a00;border-radius:10px;padding:18px 20px;">
@@ -5874,7 +5885,6 @@ async function checkPublicidad() {
     if (!d.activa) {
       if (pubActiva) cerrarPublicidad(); // Bug fix 2: cerrar si estaba activo localmente
       pubActiva = false;
-      _pubMostrarTsAnterior = 0; // Bug fix 3: resetear ts para evitar que reaparezca al reactivar
       return;
     }
 
@@ -9147,7 +9157,6 @@ def pub_activar():
 def pub_desactivar():
     with lock:
         _state['publicidad_activa'] = False
-        _state['publicidad_mostrar_ts'] = 0
         save_state()
     return jsonify({'ok': True})
 
