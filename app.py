@@ -952,7 +952,7 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
 <div id="tab-publicidad" class="screen">
   <div class="conf-header">
     <div class="conf-title">📺 Sistema de publicidad</div>
-    <div class="conf-sub">Activá un video en la pantalla de presentación. Puede ser una URL externa o un archivo mp4 subido.</div>
+    <div class="conf-sub">Subí un archivo de video .mp4 desde este dispositivo para mostrarlo en la pantalla de presentación.</div>
   </div>
   <!-- Tutorial desplegable -->
   <div style="margin-bottom:14px;">
@@ -961,47 +961,34 @@ body.tema-touchofpink.pink-claro .col-puesto{color:#eeaad8;}
     </button>
     <div id="tut-pub" style="display:none;background:#080800;border:1px solid #1a1a00;border-radius:0 0 8px 8px;padding:14px 18px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#aaa;line-height:1.8;">
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">①</span><span><strong style="color:#fff;">URL externa:</strong> Ingresá una URL directa a un archivo .mp4 y configurá cada cuántos minutos aparece en la pantalla de presentación.</span></div>
-        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">②</span><span><strong style="color:#fff;">Subir archivo:</strong> Subí un archivo .mp4 desde tu dispositivo para usarlo como publicidad.</span></div>
+        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">①</span><span><strong style="color:#fff;">Subir archivo:</strong> Elegí un archivo .mp4 guardado en este dispositivo y tocá "Subir y usar este video". El video queda guardado de forma local en el sistema.</span></div>
+        <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">②</span><span><strong style="color:#fff;">Activar programa:</strong> Configurá cada cuántos minutos aparece el video en la pantalla de presentación y tocá "Activar programa".</span></div>
         <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">③</span><span><strong style="color:#fff;">Mostrar ahora:</strong> Envía el video inmediatamente a la pantalla de presentación sin esperar el intervalo configurado.</span></div>
         <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">④</span><span>La publicidad solo aparece en el modo presentación de la pantalla principal, no en las cajas.</span></div>
       </div>
     </div>
   </div>
-  <!-- Aviso AdBlock -->
-  <div style="background:#1a0000;border:2px solid #8a1a00;border-radius:10px;padding:14px 18px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;display:flex;align-items:flex-start;gap:12px;">
-    <span style="font-size:26px;flex-shrink:0;line-height:1;">🚫</span>
-    <div>
-      <div style="font-size:14px;font-weight:700;color:#ff6633;letter-spacing:1px;margin-bottom:4px;">DESACTIVÁ TU ADBLOCK</div>
-      <div style="font-size:13px;color:#cc5533;line-height:1.6;">Para que la publicidad funcione correctamente en la pantalla de presentación, <strong style="color:#ffaa88;">desactivá el bloqueador de publicidad</strong> (AdBlock, uBlock Origin, etc.) en este sitio. Si el video no reproduce, ese es el motivo.</div>
-    </div>
-  </div>
   <div style="background:#1a0a00;border:1px solid #3a2000;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-family:'Rajdhani',sans-serif;font-size:13px;color:#c9a227;letter-spacing:0.5px;">
-    💡 Usá siempre una <strong>URL externa</strong> para el video (no subas desde la PC).
+    💡 Subí siempre un <strong>archivo .mp4 local</strong> desde este dispositivo. El video queda guardado en el sistema y no depende de internet ni de links externos.
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-    <!-- URL externa -->
+  <div style="margin-bottom:20px;">
+    <!-- Subir archivo local -->
     <div style="background:var(--surface);border:1px solid #2a5a00;border-radius:10px;padding:18px 20px;">
-      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">✅ URL de video MP4 <span style="font-size:11px;color:#3a9a5a;letter-spacing:1px;">(RECOMENDADO)</span></div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Usá un link directo a un .mp4 (Google Drive link directo, Dropbox, servidor propio, etc.)</div>
-      <label class="field-label">URL directa del video (.mp4)</label>
-      <input id="pub-url" class="field-input" type="text" placeholder="https://ejemplo.com/video.mp4" />
-      <label class="field-label">Cada cuántos minutos aparece en pantalla</label>
+      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">✅ Subir archivo de video .mp4</div>
+      <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Elegí un archivo .mp4 guardado en este dispositivo. Queda guardado de forma local en el sistema.</div>
+      <!-- URL del video (se completa sola al subir el archivo) -->
+      <input id="pub-url" type="hidden" />
+      <label class="field-label">Seleccioná un archivo .mp4</label>
+      <input id="pub-file" type="file" accept="video/mp4,.mp4" style="width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;margin-bottom:8px;" />
+      <button onclick="subirVideoPublicidad()" class="btn-add">⬆ Subir y usar este video</button>
+      <div id="pub-upload-status" style="margin:10px 0 4px;font-size:12px;color:#555;letter-spacing:1px;"></div>
+      <label class="field-label" style="margin-top:10px;">Cada cuántos minutos aparece en pantalla</label>
       <input id="pub-frec" class="field-input" type="number" min="1" max="120" value="15" />
-      <div class="btn-row" style="margin-top:4px;gap:10px;">
+      <div class="btn-row" style="margin-top:8px;gap:10px;">
         <button onclick="activarPublicidad()" class="btn-add">▶ Activar programa</button>
         <button onclick="mostrarAhora()" style="background:#1a3a1a;color:#3a9a5a;border:1px solid #2a5a2a;border-radius:7px;padding:10px 16px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px;" onmouseover="this.style.background='#223a22'" onmouseout="this.style.background='#1a3a1a'">📺 Mostrar ahora en pantalla</button>
         <button onclick="desactivarPublicidad()" style="background:transparent;color:#555;border:1px solid #222;border-radius:7px;padding:10px 16px;font-family:'Rajdhani',sans-serif;font-size:14px;cursor:pointer;transition:all .15s;" onmouseover="this.style.borderColor='#c9a227';this.style.color='#c9a227'" onmouseout="this.style.borderColor='#222';this.style.color='#555'">■ Desactivar</button>
       </div>
-    </div>
-    <!-- Subir archivo -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;opacity:0.7;">
-      <div style="font-family:'Oswald',sans-serif;font-size:13px;color:#666;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">⚠️ Subir archivo mp4</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px;font-family:'Rajdhani',sans-serif;">Subí un archivo .mp4 desde tu dispositivo.</div>
-      <label class="field-label">Seleccioná un archivo mp4</label>
-      <input id="pub-file" type="file" accept="video/mp4,.mp4" style="width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-family:'Rajdhani',sans-serif;font-size:13px;margin-bottom:14px;" />
-      <button onclick="subirVideoPublicidad()" class="btn-add">⬆ Subir y usar este video</button>
-      <div id="pub-upload-status" style="margin-top:10px;font-size:12px;color:#555;letter-spacing:1px;"></div>
     </div>
   </div>
   <div id="pub-estado-box" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;">
@@ -4037,7 +4024,7 @@ async function cargarEstadoPub() {
 async function activarPublicidad() {
   const url = (document.getElementById('pub-url')?.value||'').trim();
   const frec = parseInt(document.getElementById('pub-frec')?.value||15);
-  if (!url) { showToast('Ingresá una URL de video', true); return; }
+  if (!url) { showToast('Primero subí un video .mp4', true); return; }
   try {
     await fetch('/api/publicidad/activar', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url, frecuencia:frec})});
     await cargarEstadoPub();
@@ -5500,6 +5487,34 @@ let _designWinnerSub = '';
 let pubFrecuenciaMs = 15 * 60 * 1000;
 let pubLastShown = parseInt(localStorage.getItem('pubLastShown') || '0');
 
+// El navegador bloquea el autoplay con sonido hasta que haya una interacción en la página.
+// Con el primer clic o tecla en esta pantalla habilitamos el sonido para los videos.
+let pubAudioUnlocked = false;
+function _unlockPubAudio(){
+  pubAudioUnlocked = true;
+  const v = document.getElementById('pub-video');
+  if (v && !v.paused) { v.muted = false; }
+}
+document.addEventListener('click', _unlockPubAudio);
+document.addEventListener('keydown', _unlockPubAudio);
+document.addEventListener('touchstart', _unlockPubAudio, {passive:true});
+
+// Reproduce el video intentando con sonido; si el navegador lo bloquea, reintenta en mudo
+// para que al menos se vea (evita la pantalla en negro).
+function _playPubVideo(video, offsetSegundos){
+  if (offsetSegundos > 0 && offsetSegundos < (video.duration || Infinity)) {
+    try { video.currentTime = offsetSegundos; } catch(e){}
+  }
+  video.muted = false;
+  const p = video.play();
+  if (p && p.catch) {
+    p.catch(() => {
+      video.muted = true;            // autoplay con sonido bloqueado → reintentar en mudo
+      video.play().catch(()=>{});
+    });
+  }
+}
+
 function fmt(n){return '$'+Number(n).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});}
 
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
@@ -5926,17 +5941,11 @@ function mostrarPublicidadSync(url, offsetSegundos) {
   overlay.classList.add('show');
   // Si ya tenemos la misma URL cargada y el offset está dentro de la duración, hacer seek
   if (video.src && video.src.endsWith(url.replace(/^.*\//,'')) && video.readyState >= 2) {
-    if (offsetSegundos > 0 && offsetSegundos < video.duration) {
-      video.currentTime = offsetSegundos;
-    }
-    video.play().catch(()=>{});
+    _playPubVideo(video, offsetSegundos);
   } else {
     video.src = url;
     video.oncanplay = function() {
-      if (offsetSegundos > 0 && offsetSegundos < video.duration) {
-        video.currentTime = offsetSegundos;
-      }
-      video.play().catch(()=>{});
+      _playPubVideo(video, offsetSegundos);
       video.oncanplay = null;
     };
     video.load();
@@ -6453,6 +6462,7 @@ body{background:var(--black);color:var(--text);font-family:'Rajdhani',sans-serif
       <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">②</span><span>Seleccioná los productos del menú. Al tocar un producto lo agregás al pedido. Tocá de nuevo para sumar más unidades.</span></div>
       <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">③</span><span>En el cuadrado del producto: si hay <strong>1 unidad</strong>, aparece una ✕ para eliminar directo. Con <strong>2 o más</strong>, podés sumar o restar con los botones + / −.</span></div>
       <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">④</span><span>Tocá <strong>✓ Cobrar</strong> o presioná <strong>Enter</strong> para confirmar el pedido.</span></div>
+      <div style="display:flex;gap:10px;"><span style="color:#c9a227;flex-shrink:0;">🗂</span><span><strong style="color:#fff;">Seleccionar mesa manualmente:</strong> tocá el botón <strong>🗂</strong> (arriba a la derecha, junto al lector) para elegir la mesa directamente de la lista. <strong style="color:#e8c84a;">No es necesario pasar la tarjeta por el lector</strong> — al elegir la mesa se carga igual que si la hubieras pasado.</span></div>
       <div style="font-size:12px;color:#3a9a5a;letter-spacing:2px;text-transform:uppercase;font-weight:700;margin-top:6px;margin-bottom:4px;">✎ Sin Tarjeta</div>
       <div style="display:flex;gap:10px;"><span style="color:#3a9a5a;flex-shrink:0;">①</span><span>Ingresá nombre y mesa del cliente, luego seleccioná productos igual que con tarjeta.</span></div>
       <div style="display:flex;gap:10px;"><span style="color:#3a9a5a;flex-shrink:0;">②</span><span>El pedido se registra sin descontar saldo de tarjeta, pero suma al ranking.</span></div>
